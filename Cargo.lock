@@ -1,0 +1,18 @@
+[root]
+name = "ftb"
+version = "0.0.1"
+dependencies = [
+ "colors 0.1.0 (git+https://github.com/retep998/colors-rs#a73c383568138111f75c9ca0ffe8a167e3845dcf)",
+ "image 0.0.0 (git+https://github.com/PistonDevelopers/rust-image#c2ce36d2d1f21a76865ddd1f3b7299d248d57a6a)",
+]
+
+[[package]]
+name = "colors"
+version = "0.1.0"
+source = "git+https://github.com/retep998/colors-rs#a73c383568138111f75c9ca0ffe8a167e3845dcf"
+
+[[package]]
+name = "image"
+version = "0.0.0"
+source = "git+https://github.com/PistonDevelopers/rust-image#c2ce36d2d1f21a76865ddd1f3b7299d248d57a6a"
+
