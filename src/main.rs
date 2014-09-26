@@ -3,32 +3,41 @@
 #![feature(phase, tuple_indexing)]
 
 extern crate image;
+extern crate lodepng;
 #[phase(plugin)]
 extern crate regex_macros;
 extern crate regex;
+extern crate serialize;
 extern crate time;
 
 use image::{
     GenericImage,
     ImageBuf,
+    MutableRefImage,
     Pixel,
     Rgba,
+    SubImage,
 };
 use std::collections::HashMap;
+use std::default::Default;
 use std::io::{
     AllPermissions,
     BufferedWriter,
+    File,
     PathAlreadyExists,
     TypeFile,
 };
 use std::io::fs::{
-    File,
     copy,
     mkdir,
     readdir,
     stat,
 };
+use std::mem::swap;
+use std::rand::random;
 use time::precise_time_ns;
+
+pub mod recipes;
 
 pub fn dump_descriptions() {
     let path = Path::new(r"C:\Users\retep998\Minecraft\Wiki\GT Lang\GregTech.lang");
@@ -124,76 +133,228 @@ pub fn import_special_metaitems(lang: &HashMap<String, String>) {
     import("gt.metaitem.01");
     import("gt.metaitem.02");
 }
-pub fn update_tilesheet(name: &str, sizes: &[u32]) {
-    struct Tilesheet {
-        size: u32,
-        img: ImageBuf<Rgba<u8>>,
-    }
-    fn load_tiles(name: &str) -> HashMap<String, (u32, u32)> {
-        let reg = regex!(r"(\d+) (\d+) (.+?)\r?\n");
-        let name = format!("Tilesheet {}.txt", name);
-        let path = Path::new(r"work\tilesheets").join(name.as_slice());
-        let mut file = File::open(&path).unwrap();
-        let data = file.read_to_string().unwrap();
-        reg.captures_iter(data.as_slice()).map(|cap| {
-            let x = from_str(cap.at(1)).unwrap();
-            let y = from_str(cap.at(2)).unwrap();
-            let name = cap.at(3).into_string();
-            (name, (x, y))
-        }).collect()
-    }
-    fn load_tilesheet(name: &str, size: u32) -> Tilesheet {
-        let name = format!("Tilesheet {} {}.png", name, size);
-        let path = Path::new(r"work\tilesheets").join(name.as_slice());
-        let img = match image::open(&path) {
-            Ok(img) => img.to_rgba(),
-            Err(_) => ImageBuf::new(size * 32, size),
-        };
-        Tilesheet { size: size, img: img }
-    }
-    fn load_tilesheets(name: &str, sizes: &[u32]) -> Vec<Tilesheet> {
-        sizes.iter().map(|&size| load_tilesheet(name, size)).collect()
-    }
-    fn decode(img: ImageBuf<Rgba<u8>>) -> ImageBuf<Rgba<f32>> {
-        fn decode(x: u8) -> f32 {
-            let x = x as f32 * (1. / 255.);
-            if x <= 0.04045 {
-                x / 12.92
-            } else {
-                ((x + 0.055) / (1. + 0.055)).powf(2.4)
-            }
-        }
-        let (w, h) = img.dimensions();
-        let pix = img.pixelbuf().iter().map(|p|
-            Rgba(decode(p.0), decode(p.1), decode(p.2), decode(p.3))
-        ).collect();
-        ImageBuf::from_pixels(pix, w, h)
-    }
-    fn encode(img: ImageBuf<Rgba<f32>>) -> ImageBuf<Rgba<u8>> {
-        fn encode(x: f32) -> u8 {
-            let x = if x <= 0.0031308 {
-                x * 12.92
-            } else {
-                x.powf(1. / 2.4) * (1. + 0.055) - 0.055
-            };
-            x.round().max(0.).min(255.) as u8
-        }
-        let (w, h) = img.dimensions();
-        let pix = img.pixelbuf().iter().map(|p|
-            Rgba(encode(p.0), encode(p.1), encode(p.2), encode(p.3))
-        ).collect();
-        ImageBuf::from_pixels(pix, w, h)
-    }
-    let tilesheets = load_tilesheets(name, sizes);
-    let tiles = load_tiles(name);
+pub fn save_rand(img: &ImageBuf<Rgba<u8>>) {
+    let foo: u32 = random();
+    let foo = foo.to_string().append(".png");
+    let foo = Path::new(r"work\tilesheets\foo").join(foo.as_slice());
+    lodepng::save(img, &foo).unwrap();
 }
+struct Tilesheet {
+    size: u32,
+    img: ImageBuf<Rgba<u8>>,
+}
+impl Tilesheet {
+    fn insert(&mut self, x: u32, y: u32, img: &ImageBuf<Rgba<f32>>) {
+        let (width, height) = img.dimensions();
+        assert!(width == height);
+        assert!(x < 16);
+        println!("{} -> {}", width, self.size);
+        let img = resize(img, self.size, self.size);
+        let img = encode_srgb(&img);
+        let (mywidth, myheight) = self.img.dimensions();
+        if (y + 1) * self.size > myheight {
+            let mut img = ImageBuf::new(1, 1);
+            swap(&mut self.img, &mut img);
+            let mut pixels = img.into_vec();
+            let len = pixels.len();
+            let (w, h) = (self.size * 16, (y + 1) * self.size);
+            pixels.grow((w * h) as uint - len, Default::default());
+            let mut img = ImageBuf::from_pixels(pixels, w, h);
+            swap(&mut self.img, &mut img);
+        }
+        let mut sub = SubImage::new(
+            &mut self.img,
+            x * self.size, y * self.size,
+            self.size, self.size,
+        );
+        for ((_, _, from), (_, _, to)) in img.pixels().zip(sub.mut_pixels()) {
+            *to = from;
+        }
+    }
+}
+struct TilesheetManager {
+    name: String,
+    lookup: HashMap<String, (u32, u32)>,
+    entries: Vec<bool>,
+    tilesheets: Vec<Tilesheet>,
+    unused: uint,
+}
+impl TilesheetManager {
+    fn new(name: &str, sizes: &[u32]) -> TilesheetManager {
+        let tilesheets = load_tilesheets(name, sizes);
+        let lookup = load_tiles(name);
+        let entries = load_entries(&lookup);
+        TilesheetManager {
+            name: name.into_string(),
+            lookup: lookup,
+            entries: entries,
+            tilesheets: tilesheets,
+            unused: 0,
+        }
+    }
+    fn update(&mut self) {
+        let path = Path::new(r"work\tilesheets").join(self.name.as_slice());
+        for path in readdir(&path).unwrap().iter() {
+            if stat(path).unwrap().kind != TypeFile { continue }
+            if path.extension_str() != Some("png") { continue }
+            let name = path.filestem_str().unwrap();
+            let img = lodepng::load(path).unwrap();
+            let img = decode_srgb(&img);
+            let (x, y) = self.lookup(name);
+            for tilesheet in self.tilesheets.iter_mut() {
+                tilesheet.insert(x, y, &img);
+            }
+            //println!("{} -> ({}, {})", name, x, y);
+        }
+    }
+    fn save(&self) {
+        for tilesheet in self.tilesheets.iter() {
+            let name = format!("Tilesheet {} {}.png", self.name, tilesheet.size);
+            let path = Path::new(r"work\tilesheets").join(name.as_slice());
+            lodepng::save(&tilesheet.img, &path).unwrap();
+        }
+    }
+    fn lookup(&mut self, name: &str) -> (u32, u32) {
+        match self.lookup.find_equiv(&name) {
+            Some(&x) => return x,
+            None => (),
+        }
+        for i in range(self.unused, self.entries.len()) {
+            if self.entries[i] == true { continue }
+            self.unused = i;
+            return ((i % 16) as u32, (i / 16) as u32);
+        }
+        let i = self.entries.len();
+        self.unused = i;
+        self.entries.push(true);
+        ((i % 16) as u32, (i / 16) as u32)
+    }
+}
+fn load_tiles(name: &str) -> HashMap<String, (u32, u32)> {
+    let reg = regex!(r"(\d+) (\d+) (.+?)\r?\n");
+    let name = format!("Tilesheet {}.txt", name);
+    let path = Path::new(r"work\tilesheets").join(name.as_slice());
+    let mut file = match File::open(&path) {
+        Ok(x) => x,
+        Err(_) => {
+            println!("No tilesheet found. Creating new tilesheet.");
+            return HashMap::new();
+        }
+    };
+    let data = file.read_to_string().unwrap();
+    reg.captures_iter(data.as_slice()).map(|cap| {
+        let x = from_str(cap.at(1)).unwrap();
+        let y = from_str(cap.at(2)).unwrap();
+        let name = cap.at(3).into_string();
+        (name, (x, y))
+    }).collect()
+}
+fn load_entries(tiles: &HashMap<String, (u32, u32)>) -> Vec<bool> {
+    let mut entries = Vec::new();
+    for (_, &(x, y)) in tiles.iter() {
+        let index = y as uint * 16 + x as uint;
+        let len = entries.len();
+        if index >= len { entries.grow(index + 1 - len, false) }
+        assert!(entries[index] == false);
+        *entries.get_mut(index) = true;
+    }
+    entries
+}
+fn load_tilesheet(name: &str, size: u32) -> Tilesheet {
+    let name = format!("Tilesheet {} {}.png", name, size);
+    let path = Path::new(r"work\tilesheets").join(name.as_slice());
+    let img = match lodepng::load(&path) {
+        Ok(img) => img,
+        Err(_) => ImageBuf::new(size * 16, size),
+    };
+    let (width, _) = img.dimensions();
+    assert!(width == size * 16);
+    Tilesheet { size: size, img: img }
+}
+fn load_tilesheets(name: &str, sizes: &[u32]) -> Vec<Tilesheet> {
+    sizes.iter().map(|&size| load_tilesheet(name, size)).collect()
+}
+fn decode_srgb(img: &ImageBuf<Rgba<u8>>) -> ImageBuf<Rgba<f32>> {
+    fn decode(x: u8) -> f32 {
+        let x = x as f32 * (1. / 255.);
+        if x <= 0.04045 {
+            x / 12.92
+        } else {
+            ((x + 0.055) / (1. + 0.055)).powf(2.4)
+        }
+    }
+    let (w, h) = img.dimensions();
+    let pix = img.pixelbuf().iter().map(|p|
+        Rgba(decode(p.0), decode(p.1), decode(p.2), decode(p.3))
+    ).collect();
+    ImageBuf::from_pixels(pix, w, h)
+}
+fn encode_srgb(img: &ImageBuf<Rgba<f32>>) -> ImageBuf<Rgba<u8>> {
+    fn encode(x: f32) -> u8 {
+        let x = if x <= 0.0031308 {
+            x * 12.92
+        } else {
+            x.powf(1. / 2.4) * (1. + 0.055) - 0.055
+        };
+        (x * 255.).round().max(0.).min(255.) as u8
+    }
+    let (w, h) = img.dimensions();
+    let pix = img.pixelbuf().iter().map(|p|
+        Rgba(encode(p.0), encode(p.1), encode(p.2), encode(p.3))
+    ).collect();
+    ImageBuf::from_pixels(pix, w, h)
+}
+fn resize(img: &ImageBuf<Rgba<f32>>, width: u32, height: u32) -> ImageBuf<Rgba<f32>> {
+    let (w, h) = img.dimensions();
+    assert!(width == height);
+    assert!(w == h);
+    if width < w {
+        let mut new = ImageBuf::new(width, height);
+        let (rw, rh) = (w as f32 / (width as f32), h as f32 / (height as f32));
+        for (x, y, pixel) in new.mut_pixels() {
+            let (x1, x2) = ((x as f32 * rw) as u32, ((x + 1) as f32 * rw) as u32);
+            let (y1, y2) = ((y as f32 * rh) as u32, ((y + 1) as f32 * rh) as u32);
+            let (mut r, mut g, mut b, mut a) = (0., 0., 0., 0.);
+            for xx in range(x1, x2) {
+                for yy in range(y1, y2) {
+                    let p = img.get_pixel(xx, yy);
+                    r += p.0;
+                    g += p.1;
+                    b += p.2;
+                    a += p.3;
+                }
+            }
+            let m = 1. / (((x2 - x1) * (y2 - y1)) as f32);
+            *pixel = Rgba(r * m, g * m, b * m, a * m);
+        }
+        new
+    } else if width == w {
+        img.clone()
+    } else {
+        let mut new = ImageBuf::new(width, height);
+        let (rw, rh) = (w as f32 / (width as f32), h as f32 / (height as f32));
+        for (x, y, pixel) in new.mut_pixels() {
+            let xx = (x as f32 * rw) as u32;
+            let yy = (y as f32 * rh) as u32;
+            *pixel = img.get_pixel(xx, yy);
+        }
+        new
+    }
+}
+pub fn update_tilesheet(name: &str, sizes: &[u32]) {
+    let mut manager = TilesheetManager::new(name, sizes);
+    manager.update();
+    manager.save();
+}
+
 fn main() {
-    fail!("hi");
+    // do_recipe_calc();
     // let lang = read_lang();
     // import_special_metaitems(&lang);
     // update_tilesheet("IC2", &[16, 32]);
+    // recipe_calculator();
     let a = precise_time_ns();
-    image::open(&Path::new(r"work\tilesheets\Tilesheet IC2 32.png"));
+    update_tilesheet("GT", &[16, 32]);
     let b = precise_time_ns();
     println!("{}ms", (b - a) / 1_000_000);
 }

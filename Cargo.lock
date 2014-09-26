@@ -4,6 +4,7 @@ version = "0.0.1"
 dependencies = [
  "colors 0.1.0 (git+https://github.com/retep998/colors-rs#01a6ca46252c006cd299e4cb750cb52a869f5781)",
  "image 0.0.0 (git+https://github.com/PistonDevelopers/rust-image#ee0e7064d96a1015650481b7046420e6238cf53d)",
+ "lodepng 0.0.1 (git+https://github.com/retep998/lodepng-rs#504ffe255aa77bbce5ba4dc5be70650586661586)",
 ]
 
 [[package]]
@@ -15,4 +16,12 @@ source = "git+https://github.com/retep998/colors-rs#01a6ca46252c006cd299e4cb750c
 name = "image"
 version = "0.0.0"
 source = "git+https://github.com/PistonDevelopers/rust-image#ee0e7064d96a1015650481b7046420e6238cf53d"
+
+[[package]]
+name = "lodepng"
+version = "0.0.1"
+source = "git+https://github.com/retep998/lodepng-rs#504ffe255aa77bbce5ba4dc5be70650586661586"
+dependencies = [
+ "image 0.0.0 (git+https://github.com/PistonDevelopers/rust-image#ee0e7064d96a1015650481b7046420e6238cf53d)",
+]
 

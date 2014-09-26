@@ -9,3 +9,6 @@ git = "https://github.com/PistonDevelopers/rust-image"
 
 [dependencies.colors]
 git = "https://github.com/retep998/colors-rs"
+
+[dependencies.lodepng]
+git = "https://github.com/retep998/lodepng-rs"
