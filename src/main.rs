@@ -34,7 +34,6 @@ use std::io::fs::{
     stat,
 };
 use std::mem::swap;
-use std::rand::random;
 use time::precise_time_ns;
 
 pub mod recipes;
@@ -133,12 +132,6 @@ pub fn import_special_metaitems(lang: &HashMap<String, String>) {
     import("gt.metaitem.01");
     import("gt.metaitem.02");
 }
-pub fn save_rand(img: &ImageBuf<Rgba<u8>>) {
-    let foo: u32 = random();
-    let foo = foo.to_string().append(".png");
-    let foo = Path::new(r"work\tilesheets\foo").join(foo.as_slice());
-    lodepng::save(img, &foo).unwrap();
-}
 struct Tilesheet {
     size: u32,
     img: ImageBuf<Rgba<u8>>,
@@ -148,10 +141,9 @@ impl Tilesheet {
         let (width, height) = img.dimensions();
         assert!(width == height);
         assert!(x < 16);
-        println!("{} -> {}", width, self.size);
         let img = resize(img, self.size, self.size);
         let img = encode_srgb(&img);
-        let (mywidth, myheight) = self.img.dimensions();
+        let (_, myheight) = self.img.dimensions();
         if (y + 1) * self.size > myheight {
             let mut img = ImageBuf::new(1, 1);
             swap(&mut self.img, &mut img);
@@ -175,7 +167,7 @@ impl Tilesheet {
 struct TilesheetManager {
     name: String,
     lookup: HashMap<String, (u32, u32)>,
-    entries: Vec<bool>,
+    entries: Vec<String>,
     tilesheets: Vec<Tilesheet>,
     unused: uint,
 }
@@ -204,7 +196,6 @@ impl TilesheetManager {
             for tilesheet in self.tilesheets.iter_mut() {
                 tilesheet.insert(x, y, &img);
             }
-            //println!("{} -> ({}, {})", name, x, y);
         }
     }
     fn save(&self) {
@@ -213,6 +204,13 @@ impl TilesheetManager {
             let path = Path::new(r"work\tilesheets").join(name.as_slice());
             lodepng::save(&tilesheet.img, &path).unwrap();
         }
+        let name = format!("Tilesheet {}.txt", self.name);
+        let path = Path::new(r"work\tilesheets").join(name.as_slice());
+        let mut file = BufferedWriter::new(File::create(&path).unwrap());
+        for (i, tile) in self.entries.iter().enumerate() {
+            let (x, y) = ((i % 16) as u32, (i / 16) as u32);
+            (writeln!(file, "{} {} {}", x, y, tile)).unwrap();
+        }
     }
     fn lookup(&mut self, name: &str) -> (u32, u32) {
         match self.lookup.find_equiv(&name) {
@@ -220,14 +218,19 @@ impl TilesheetManager {
             None => (),
         }
         for i in range(self.unused, self.entries.len()) {
-            if self.entries[i] == true { continue }
+            if self.entries[i].as_slice() != "" { continue }
+            *self.entries.get_mut(i) = name.into_string();
             self.unused = i;
-            return ((i % 16) as u32, (i / 16) as u32);
+            let (x, y) = ((i % 16) as u32, (i / 16) as u32);
+            self.lookup.insert(name.into_string(), (x, y));
+            return (x, y);
         }
         let i = self.entries.len();
+        self.entries.push(name.into_string());
         self.unused = i;
-        self.entries.push(true);
-        ((i % 16) as u32, (i / 16) as u32)
+        let (x, y) = ((i % 16) as u32, (i / 16) as u32);
+        self.lookup.insert(name.into_string(), (x, y));
+        (x, y)
     }
 }
 fn load_tiles(name: &str) -> HashMap<String, (u32, u32)> {
@@ -249,14 +252,14 @@ fn load_tiles(name: &str) -> HashMap<String, (u32, u32)> {
         (name, (x, y))
     }).collect()
 }
-fn load_entries(tiles: &HashMap<String, (u32, u32)>) -> Vec<bool> {
+fn load_entries(tiles: &HashMap<String, (u32, u32)>) -> Vec<String> {
     let mut entries = Vec::new();
-    for (_, &(x, y)) in tiles.iter() {
+    for (name, &(x, y)) in tiles.iter() {
         let index = y as uint * 16 + x as uint;
         let len = entries.len();
-        if index >= len { entries.grow(index + 1 - len, false) }
-        assert!(entries[index] == false);
-        *entries.get_mut(index) = true;
+        if index >= len { entries.grow(index + 1 - len, String::new()) }
+        assert!(entries[index].as_slice() == "");
+        *entries.get_mut(index) = name.clone();
     }
     entries
 }
