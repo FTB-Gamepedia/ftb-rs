@@ -96,17 +96,17 @@ pub fn dump_descriptions() {
         file.write_line("").unwrap();
     }
 }
-pub fn read_lang() -> HashMap<String, String> {
+pub fn read_gt_lang() -> HashMap<String, String> {
     let path = Path::new(r"work/GregTech.lang");
     let mut file = File::open(&path).unwrap();
     let data = file.read_to_string().unwrap();
-    let reg = regex!(r"S:([\w\.]+?)\.name=(.+?)\r?\n");
+    let reg = regex!(r"S:([\w\.]+?)=(.+?)\r?\n");
     reg.captures_iter(data.as_slice()).map(|cap|
         (cap.at(1).into_string(), cap.at(2).into_string())
     ).collect()
 }
 pub fn import_special_metaitems(lang: &HashMap<String, String>) {
-    let inpath = Path::new(r"work\assets\gregtech\textures\items");
+    let inpath = Path::new(r"work\assets\gt\gregtech\textures\items");
     let outpath = Path::new(r"work\tilesheets\GT");
     match mkdir(&outpath, AllPermissions) {
         Ok(_) => (),
@@ -118,7 +118,7 @@ pub fn import_special_metaitems(lang: &HashMap<String, String>) {
             if stat(path).unwrap().kind != TypeFile { continue }
             if path.extension_str() != Some("png") { continue }
             let stub: u32 = from_str(path.filestem_str().unwrap()).unwrap();
-            let rawname = format!("{}.{}", category, stub + 32000);
+            let rawname = format!("{}.{}.name", category, stub + 32000);
             let name = match lang.find(&rawname) {
                 Some(s) => s,
                 None => continue,
@@ -126,11 +126,37 @@ pub fn import_special_metaitems(lang: &HashMap<String, String>) {
             let mut out = outpath.join(name.as_slice());
             out.set_extension("png");
             copy(path, &out).unwrap();
-            println!("{} -> {}", rawname, name);
         }
     };
     import("gt.metaitem.01");
     import("gt.metaitem.02");
+}
+pub fn import_fluids(lang: &HashMap<String, String>) {
+    let inpath = Path::new(r"work\assets\gt\gregtech\textures\blocks\fluids");
+    let outpath = Path::new(r"work\tilesheets\GT");
+    match mkdir(&outpath, AllPermissions) {
+        Ok(_) => (),
+        Err(ref e) if e.kind == PathAlreadyExists => (),
+        Err(e) => println!("{}", e),
+    }
+    for path in readdir(&inpath).unwrap().iter() {
+        if stat(path).unwrap().kind != TypeFile { continue }
+        if path.extension_str() != Some("png") { continue }
+        let stub = path.filestem_str().unwrap();
+        let name = match lang.find_equiv(&stub) {
+            Some(s) => s,
+            None => continue,
+        };
+        let name = format!("{} (Fluid)", name);
+        let mut out = outpath.join(name.as_slice());
+        out.set_extension("png");
+        let img = lodepng::load(path).unwrap();
+        let (w, h) = img.dimensions();
+        let mut pixels = img.into_vec();
+        pixels.truncate(w as uint * w as uint);
+        let img = ImageBuf::from_pixels(pixels, w, w);
+        lodepng::save(&img, &out).unwrap();
+    }
 }
 struct Tilesheet {
     size: u32,
@@ -287,9 +313,10 @@ fn decode_srgb(img: &ImageBuf<Rgba<u8>>) -> ImageBuf<Rgba<f32>> {
         }
     }
     let (w, h) = img.dimensions();
-    let pix = img.pixelbuf().iter().map(|p|
-        Rgba(decode(p.0), decode(p.1), decode(p.2), decode(p.3))
-    ).collect();
+    let pix = img.pixelbuf().iter().map(|p| {
+        let p = Rgba(decode(p.0), decode(p.1), decode(p.2), decode(p.3));
+        Rgba(p.0 * p.3, p.1 * p.3, p.2 * p.3, p.3)
+    }).collect();
     ImageBuf::from_pixels(pix, w, h)
 }
 fn encode_srgb(img: &ImageBuf<Rgba<f32>>) -> ImageBuf<Rgba<u8>> {
@@ -302,9 +329,14 @@ fn encode_srgb(img: &ImageBuf<Rgba<f32>>) -> ImageBuf<Rgba<u8>> {
         (x * 255.).round().max(0.).min(255.) as u8
     }
     let (w, h) = img.dimensions();
-    let pix = img.pixelbuf().iter().map(|p|
+    let pix = img.pixelbuf().iter().map(|p| {
+        let p = if p.3 > 0.0001 {
+            Rgba(p.0 / p.3, p.1 / p.3, p.2 / p.3, p.3)
+        } else {
+            Rgba(0., 0., 0., 0.)
+        };
         Rgba(encode(p.0), encode(p.1), encode(p.2), encode(p.3))
-    ).collect();
+    }).collect();
     ImageBuf::from_pixels(pix, w, h)
 }
 fn resize(img: &ImageBuf<Rgba<f32>>, width: u32, height: u32) -> ImageBuf<Rgba<f32>> {
@@ -351,12 +383,11 @@ pub fn update_tilesheet(name: &str, sizes: &[u32]) {
 }
 
 fn main() {
-    // do_recipe_calc();
-    // let lang = read_lang();
-    // import_special_metaitems(&lang);
-    // update_tilesheet("IC2", &[16, 32]);
-    // recipe_calculator();
+    // recipes::do_recipe_calc();
     let a = precise_time_ns();
+    let lang = read_gt_lang();
+    import_special_metaitems(&lang);
+    import_fluids(&lang);
     update_tilesheet("GT", &[16, 32]);
     let b = precise_time_ns();
     println!("{}ms", (b - a) / 1_000_000);
