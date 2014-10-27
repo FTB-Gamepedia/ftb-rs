@@ -1,6 +1,6 @@
 // Copyright © 2014, Peter Atashian
 
-#![feature(phase, tuple_indexing)]
+#![feature(phase, tuple_indexing, associated_types, slicing_syntax)]
 
 extern crate image;
 extern crate lodepng;
@@ -16,15 +16,14 @@ use image::{
     MutableRefImage,
     Pixel,
     Rgba,
-    SubImage,
 };
-use std::collections::HashMap;
-use std::default::Default;
+use std::collections::{
+    HashMap,
+};
 use std::io::{
-    AllPermissions,
+    ALL_PERMISSIONS,
     BufferedWriter,
     File,
-    PathAlreadyExists,
     TypeFile,
 };
 use std::io::fs::{
@@ -33,10 +32,9 @@ use std::io::fs::{
     readdir,
     stat,
 };
-use std::mem::swap;
 use time::precise_time_ns;
 
-pub mod recipes;
+pub mod tilesheets;
 
 pub fn dump_descriptions() {
     let path = Path::new(r"C:\Users\retep998\Minecraft\Wiki\GT Lang\GregTech.lang");
@@ -108,11 +106,7 @@ pub fn read_gt_lang() -> HashMap<String, String> {
 pub fn import_special_metaitems(lang: &HashMap<String, String>) {
     let inpath = Path::new(r"work\assets\gt\gregtech\textures\items");
     let outpath = Path::new(r"work\tilesheets\GT");
-    match mkdir(&outpath, AllPermissions) {
-        Ok(_) => (),
-        Err(ref e) if e.kind == PathAlreadyExists => (),
-        Err(e) => println!("{}", e),
-    }
+    let _ = mkdir(&outpath, ALL_PERMISSIONS);
     let import = |category: &str| {
         for path in readdir(&inpath.join(category)).unwrap().iter() {
             if stat(path).unwrap().kind != TypeFile { continue }
@@ -134,11 +128,7 @@ pub fn import_special_metaitems(lang: &HashMap<String, String>) {
 pub fn import_fluids(lang: &HashMap<String, String>) {
     let inpath = Path::new(r"work\assets\gt\gregtech\textures\blocks\fluids");
     let outpath = Path::new(r"work\tilesheets\GT");
-    match mkdir(&outpath, AllPermissions) {
-        Ok(_) => (),
-        Err(ref e) if e.kind == PathAlreadyExists => (),
-        Err(e) => println!("{}", e),
-    }
+    let _ = mkdir(&outpath, ALL_PERMISSIONS);
     for path in readdir(&inpath).unwrap().iter() {
         if stat(path).unwrap().kind != TypeFile { continue }
         if path.extension_str() != Some("png") { continue }
@@ -158,166 +148,66 @@ pub fn import_fluids(lang: &HashMap<String, String>) {
         lodepng::save(&img, &out).unwrap();
     }
 }
-struct Tilesheet {
-    size: u32,
-    img: ImageBuf<Rgba<u8>>,
-}
-impl Tilesheet {
-    fn insert(&mut self, x: u32, y: u32, img: &ImageBuf<Rgba<f32>>) {
+pub fn render_blocks(lang: &HashMap<String, String>) {
+    let inpath = Path::new(r"work\assets\gt\gregtech\textures\blocks\iconsets");
+    let outpath = Path::new(r"work\tilesheets\GT");
+    let _ = mkdir(&outpath, ALL_PERMISSIONS);
+    let skew_down = |img: &ImageBuf<Rgba<f32>>| {
         let (width, height) = img.dimensions();
-        assert!(width == height);
-        assert!(x < 16);
-        let img = resize(img, self.size, self.size);
-        let img = encode_srgb(&img);
-        let (_, myheight) = self.img.dimensions();
-        if (y + 1) * self.size > myheight {
-            let mut img = ImageBuf::new(1, 1);
-            swap(&mut self.img, &mut img);
-            let mut pixels = img.into_vec();
-            let len = pixels.len();
-            let (w, h) = (self.size * 16, (y + 1) * self.size);
-            pixels.grow((w * h) as uint - len, Default::default());
-            let mut img = ImageBuf::from_pixels(pixels, w, h);
-            swap(&mut self.img, &mut img);
+        let mut out = ImageBuf::from_pixel(width, height + width / 2, Rgba(0., 0., 0., 0.));
+        for (x, y, p) in img.pixels() {
+            let y = y + x / 2;
+            out.put_pixel(x, y, p);
         }
-        let mut sub = SubImage::new(
-            &mut self.img,
-            x * self.size, y * self.size,
-            self.size, self.size,
-        );
-        for ((_, _, from), (_, _, to)) in img.pixels().zip(sub.mut_pixels()) {
-            *to = from;
-        }
-    }
+        out
+    };
+    let render_block = |langname, texture| {
+        let name = format!("{}.png", texture);
+        let img = decode_srgb(&lodepng::load(&inpath.join(name)).unwrap());
+        let size = 150f64;
+        let sin30 = 30f64.to_radians().sin();
+        let cos30 = 30f64.to_radians().cos();
+        let sqrt2 = 2f64.sqrt();
+        let sqrt3 = 3f64.sqrt();
+        let sidelen = size * 2. * (sqrt3 - sqrt2);
+        let vertlen = sidelen * cos30;
+        let diagonal = sidelen * sqrt2;
+        let halfwidth = diagonal * 0.5;
+        let img = resize(&img, halfwidth as u32, vertlen as u32);
+        let name = lang.find(&format!("{}.name", langname)).unwrap();
+        let name = format!("{}.png", name);
+        let img = skew_down(&img);
+        lodepng::save(&encode_srgb(&img), &outpath.join(name)).unwrap();
+    };
+    render_block("gt.blockgranites.8", "GRANITE_RED_STONE");
 }
-struct TilesheetManager {
-    name: String,
-    lookup: HashMap<String, (u32, u32)>,
-    entries: Vec<String>,
-    tilesheets: Vec<Tilesheet>,
-    unused: uint,
+trait Srgb {
+    type Linear;
+    fn decode(&self) -> <Self as Srgb>::Linear;
 }
-impl TilesheetManager {
-    fn new(name: &str, sizes: &[u32]) -> TilesheetManager {
-        let tilesheets = load_tilesheets(name, sizes);
-        let lookup = load_tiles(name);
-        let entries = load_entries(&lookup);
-        TilesheetManager {
-            name: name.into_string(),
-            lookup: lookup,
-            entries: entries,
-            tilesheets: tilesheets,
-            unused: 0,
-        }
-    }
-    fn update(&mut self) {
-        let path = Path::new(r"work\tilesheets").join(self.name.as_slice());
-        for path in readdir(&path).unwrap().iter() {
-            if stat(path).unwrap().kind != TypeFile { continue }
-            if path.extension_str() != Some("png") { continue }
-            let name = path.filestem_str().unwrap();
-            let img = lodepng::load(path).unwrap();
-            let img = decode_srgb(&img);
-            let (x, y) = self.lookup(name);
-            for tilesheet in self.tilesheets.iter_mut() {
-                tilesheet.insert(x, y, &img);
+impl Srgb for Rgba<u8> {
+    type Linear = Rgba<f32>;
+    fn decode(&self) -> Rgba<f32> {
+        fn dec(x: u8) -> f32 {
+            let x = x as f32 * (1. / 255.);
+            if x <= 0.04045 {
+                x / 12.92
+            } else {
+                ((x + 0.055) / (1. + 0.055)).powf(2.4)
             }
         }
+        let p = Rgba(dec(self.0), dec(self.1), dec(self.2), dec(self.3));
+        Rgba(p.0 * p.3, p.1 * p.3, p.2 * p.3, p.3)
     }
-    fn save(&self) {
-        for tilesheet in self.tilesheets.iter() {
-            let name = format!("Tilesheet {} {}.png", self.name, tilesheet.size);
-            let path = Path::new(r"work\tilesheets").join(name.as_slice());
-            lodepng::save(&tilesheet.img, &path).unwrap();
-        }
-        let name = format!("Tilesheet {}.txt", self.name);
-        let path = Path::new(r"work\tilesheets").join(name.as_slice());
-        let mut file = BufferedWriter::new(File::create(&path).unwrap());
-        for (i, tile) in self.entries.iter().enumerate() {
-            let (x, y) = ((i % 16) as u32, (i / 16) as u32);
-            (writeln!(file, "{} {} {}", x, y, tile)).unwrap();
-        }
-    }
-    fn lookup(&mut self, name: &str) -> (u32, u32) {
-        match self.lookup.find_equiv(&name) {
-            Some(&x) => return x,
-            None => (),
-        }
-        for i in range(self.unused, self.entries.len()) {
-            if self.entries[i].as_slice() != "" { continue }
-            *self.entries.get_mut(i) = name.into_string();
-            self.unused = i;
-            let (x, y) = ((i % 16) as u32, (i / 16) as u32);
-            self.lookup.insert(name.into_string(), (x, y));
-            return (x, y);
-        }
-        let i = self.entries.len();
-        self.entries.push(name.into_string());
-        self.unused = i;
-        let (x, y) = ((i % 16) as u32, (i / 16) as u32);
-        self.lookup.insert(name.into_string(), (x, y));
-        (x, y)
-    }
-}
-fn load_tiles(name: &str) -> HashMap<String, (u32, u32)> {
-    let reg = regex!(r"(\d+) (\d+) (.+?)\r?\n");
-    let name = format!("Tilesheet {}.txt", name);
-    let path = Path::new(r"work\tilesheets").join(name.as_slice());
-    let mut file = match File::open(&path) {
-        Ok(x) => x,
-        Err(_) => {
-            println!("No tilesheet found. Creating new tilesheet.");
-            return HashMap::new();
-        }
-    };
-    let data = file.read_to_string().unwrap();
-    reg.captures_iter(data.as_slice()).map(|cap| {
-        let x = from_str(cap.at(1)).unwrap();
-        let y = from_str(cap.at(2)).unwrap();
-        let name = cap.at(3).into_string();
-        (name, (x, y))
-    }).collect()
-}
-fn load_entries(tiles: &HashMap<String, (u32, u32)>) -> Vec<String> {
-    let mut entries = Vec::new();
-    for (name, &(x, y)) in tiles.iter() {
-        let index = y as uint * 16 + x as uint;
-        let len = entries.len();
-        if index >= len { entries.grow(index + 1 - len, String::new()) }
-        assert!(entries[index].as_slice() == "");
-        *entries.get_mut(index) = name.clone();
-    }
-    entries
-}
-fn load_tilesheet(name: &str, size: u32) -> Tilesheet {
-    let name = format!("Tilesheet {} {}.png", name, size);
-    let path = Path::new(r"work\tilesheets").join(name.as_slice());
-    let img = match lodepng::load(&path) {
-        Ok(img) => img,
-        Err(_) => ImageBuf::new(size * 16, size),
-    };
-    let (width, _) = img.dimensions();
-    assert!(width == size * 16);
-    Tilesheet { size: size, img: img }
-}
-fn load_tilesheets(name: &str, sizes: &[u32]) -> Vec<Tilesheet> {
-    sizes.iter().map(|&size| load_tilesheet(name, size)).collect()
 }
 fn decode_srgb(img: &ImageBuf<Rgba<u8>>) -> ImageBuf<Rgba<f32>> {
-    fn decode(x: u8) -> f32 {
-        let x = x as f32 * (1. / 255.);
-        if x <= 0.04045 {
-            x / 12.92
-        } else {
-            ((x + 0.055) / (1. + 0.055)).powf(2.4)
-        }
-    }
     let (w, h) = img.dimensions();
-    let pix = img.pixelbuf().iter().map(|p| {
-        let p = Rgba(decode(p.0), decode(p.1), decode(p.2), decode(p.3));
-        Rgba(p.0 * p.3, p.1 * p.3, p.2 * p.3, p.3)
-    }).collect();
+    let pix = img.pixelbuf().iter().map(|p| p.decode()).collect();
     ImageBuf::from_pixels(pix, w, h)
+}
+trait Linear {
+    type Srgb;
+    fn encode(&self) -> <Self as Linear>::Srgb;
 }
 fn encode_srgb(img: &ImageBuf<Rgba<f32>>) -> ImageBuf<Rgba<u8>> {
     fn encode(x: f32) -> u8 {
@@ -341,8 +231,7 @@ fn encode_srgb(img: &ImageBuf<Rgba<f32>>) -> ImageBuf<Rgba<u8>> {
 }
 fn resize(img: &ImageBuf<Rgba<f32>>, width: u32, height: u32) -> ImageBuf<Rgba<f32>> {
     let (w, h) = img.dimensions();
-    assert!(width == height);
-    assert!(w == h);
+    assert!(width.cmp(&w) == height.cmp(&h));
     if width < w {
         let mut new = ImageBuf::new(width, height);
         let (rw, rh) = (w as f32 / (width as f32), h as f32 / (height as f32));
@@ -376,19 +265,70 @@ fn resize(img: &ImageBuf<Rgba<f32>>, width: u32, height: u32) -> ImageBuf<Rgba<f
         new
     }
 }
-pub fn update_tilesheet(name: &str, sizes: &[u32]) {
-    let mut manager = TilesheetManager::new(name, sizes);
-    manager.update();
-    manager.save();
+
+pub fn check_lang_dups(lang: &HashMap<String, String>) {
+    let mut stuff = HashMap::new();
+    for (key, val) in lang.iter() {
+        if key.as_slice().contains(".tooltip") { continue }
+        if !key.as_slice().contains(".metaitem") { continue }
+        match stuff.find(val) {
+            Some(other) => {
+                println!("Collision for {}", val);
+                println!("{} && {}", key, other);
+            },
+            None => (),
+        }
+        stuff.insert(val.clone(), key);
+    }
+}
+pub fn check_navbox() {
+    let reg = regex!(r"(\d+) (\d+) (.+?)\r?\n");
+    let path = Path::new(r"work\navbox.txt");
+    let mut file = File::open(&path).unwrap();
+    let navbox = file.read_to_string().unwrap();
+    let navbox = navbox.as_slice();
+    let path = Path::new(r"work\tilesheets\Tilesheet GT.txt");
+    let mut file = File::open(&path).unwrap();
+    let data = file.read_to_string().unwrap();
+    for cap in reg.captures_iter(data.as_slice()) {
+        let name = format!("mod=GT|{}", cap.at(3));
+        let name = name.as_slice();
+        if !navbox.contains(name) && !name.contains("(Fluid)") {
+            println!("{}", cap.at(3));
+        }
+    }
+}
+
+pub fn ms_fun() {
+    let original = File::open(&Path::new("dump.data")).read_to_end().unwrap();
+    for n in range(0, 8u) {
+        let data = range(0, 185120u / 16).map(|i| {
+            Rgba(
+                (original[i * 16 + n * 2 + 0] & 0x0f) << 4,
+                (original[i * 16 + n * 2 + 0] & 0xf0),
+                (original[i * 16 + n * 2 + 1] & 0x0f) << 4,
+                (original[i * 16 + n * 2 + 1] & 0xf0),
+            )
+        }).collect();
+        let img = ImageBuf::from_pixels(data, 178, 65);
+        let name = format!("{}.png", n);
+        lodepng::save(&img, &Path::new(name[])).unwrap();
+    }
+}
+pub fn gen_navbox() {
+    let fin = File::open(&Path::new("work/navboxin.txt"));
+    let fout = File::create(&Path::new("work/navboxout.txt"));
 }
 
 fn main() {
-    // recipes::do_recipe_calc();
     let a = precise_time_ns();
-    let lang = read_gt_lang();
-    import_special_metaitems(&lang);
-    import_fluids(&lang);
-    update_tilesheet("GT", &[16, 32]);
+    // let lang = read_gt_lang();
+    // check_lang_dups(&lang);
+    // render_blocks(&lang);
+    // import_special_metaitems(&lang);
+    // import_fluids(&lang);
+    // tilesheets::update_tilesheet("GT", &[16, 32]);
+    // check_navbox();
     let b = precise_time_ns();
     println!("{}ms", (b - a) / 1_000_000);
 }
