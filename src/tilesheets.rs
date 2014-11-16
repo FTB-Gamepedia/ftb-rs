@@ -56,7 +56,7 @@ impl Tilesheet {
             x * self.size, y * self.size,
             self.size, self.size,
         );
-        for ((_, _, from), (_, _, to)) in img.pixels().zip(sub.mut_pixels()) {
+        for ((_, _, from), (_, _, to)) in img.pixels().zip(sub.pixels_mut()) {
             *to = from;
         }
     }
@@ -110,13 +110,13 @@ impl TilesheetManager {
         }
     }
     fn lookup(&mut self, name: &str) -> (u32, u32) {
-        match self.lookup.find_equiv(&name) {
+        match self.lookup.find_equiv(name) {
             Some(&x) => return x,
             None => (),
         }
         for i in range(self.unused, self.entries.len()) {
             if self.entries[i].as_slice() != "" { continue }
-            *self.entries.get_mut(i) = name.into_string();
+            self.entries[i] = name.into_string();
             self.unused = i;
             let (x, y) = ((i % 16) as u32, (i / 16) as u32);
             self.lookup.insert(name.into_string(), (x, y));
@@ -156,7 +156,7 @@ fn load_entries(tiles: &HashMap<String, (u32, u32)>) -> Vec<String> {
         let len = entries.len();
         if index >= len { entries.grow(index + 1 - len, String::new()) }
         assert!(entries[index].as_slice() == "");
-        *entries.get_mut(index) = name.clone();
+        entries[index] = name.clone();
     }
     entries
 }
