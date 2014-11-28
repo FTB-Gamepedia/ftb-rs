@@ -2,12 +2,15 @@
 
 #![feature(phase, tuple_indexing, associated_types, slicing_syntax, if_let)]
 
+extern crate cookie;
+extern crate hyper;
 extern crate image;
 extern crate lodepng;
 #[phase(plugin)]
 extern crate regex_macros;
 extern crate regex;
 extern crate serialize;
+extern crate url;
 
 use image::{
     GenericImage,
@@ -24,7 +27,7 @@ use std::io::{
     BufferedReader,
     BufferedWriter,
     File,
-    TypeFile,
+    FileType,
 };
 use std::io::fs::{
     PathExtensions,
@@ -40,6 +43,7 @@ use std::num::{
 };
 
 pub mod tilesheets;
+pub mod api;
 
 pub fn dump_descriptions() {
     let path = Path::new(r"C:\Users\retep998\Minecraft\Wiki\GT Lang\GregTech.lang");
@@ -57,7 +61,7 @@ pub fn dump_descriptions() {
     let mut file = BufferedWriter::new(File::create(&Path::new("descriptions.txt")).unwrap());
     for desc in descs.iter() {
         let &(index, name, desc) = desc;
-        (write!(file, "{},{},", index, name)).unwrap();
+        (write!(&mut file, "{},{},", index, name)).unwrap();
         let mut color = false;
         let mut code = false;
         for c in desc.chars() {
@@ -114,7 +118,7 @@ pub fn import_special_metaitems(lang: &HashMap<String, String>) {
     let _ = mkdir(&outpath, ALL_PERMISSIONS);
     let import = |category: &str| {
         for path in readdir(&inpath.join(category)).unwrap().iter() {
-            if stat(path).unwrap().kind != TypeFile { continue }
+            if stat(path).unwrap().kind != FileType::RegularFile { continue }
             if path.extension_str() != Some("png") { continue }
             let stub: u32 = from_str(path.filestem_str().unwrap()).unwrap();
             let rawname = format!("{}.{}.name", category, stub + 32000);
@@ -134,10 +138,10 @@ pub fn import_fluids(lang: &HashMap<String, String>) {
     let outpath = Path::new(r"work\tilesheets\GT");
     let _ = mkdir(&outpath, ALL_PERMISSIONS);
     for path in readdir(&inpath).unwrap().iter() {
-        if stat(path).unwrap().kind != TypeFile { continue }
+        if stat(path).unwrap().kind != FileType::RegularFile { continue }
         if path.extension_str() != Some("png") { continue }
         let stub = path.filestem_str().unwrap();
-        let name = match lang.find_equiv(stub) {
+        let name = match lang.get(stub) {
             Some(s) => s,
             None => continue,
         };
@@ -151,39 +155,6 @@ pub fn import_fluids(lang: &HashMap<String, String>) {
         let img = ImageBuf::from_pixels(pixels, w, w);
         lodepng::save(&img, &out).unwrap();
     }
-}
-pub fn render_blocks(lang: &HashMap<String, String>) {
-    let inpath = Path::new(r"work\assets\gt\gregtech\textures\blocks\iconsets");
-    let outpath = Path::new(r"work\tilesheets\GT");
-    let _ = mkdir(&outpath, ALL_PERMISSIONS);
-    let skew_down = |img: &ImageBuf<Rgba<f32>>| {
-        let (width, height) = img.dimensions();
-        let mut out = ImageBuf::from_pixel(width, height + width / 2, Rgba(0., 0., 0., 0.));
-        for (x, y, p) in img.pixels() {
-            let y = y + x / 2;
-            out.put_pixel(x, y, p);
-        }
-        out
-    };
-    let render_block = |langname, texture| {
-        let name = format!("{}.png", texture);
-        let img = decode_srgb(&lodepng::load(&inpath.join(name)).unwrap());
-        let size = 150f64;
-        let sin30 = 30f64.to_radians().sin();
-        let cos30 = 30f64.to_radians().cos();
-        let sqrt2 = 2f64.sqrt();
-        let sqrt3 = 3f64.sqrt();
-        let sidelen = size * 2. * (sqrt3 - sqrt2);
-        let vertlen = sidelen * cos30;
-        let diagonal = sidelen * sqrt2;
-        let halfwidth = diagonal * 0.5;
-        let img = resize(&img, halfwidth as u32, vertlen as u32);
-        let name = lang.get(&format!("{}.name", langname)).unwrap();
-        let name = format!("{}.png", name);
-        let img = skew_down(&img);
-        lodepng::save(&encode_srgb(&img), &outpath.join(name)).unwrap();
-    };
-    render_block("gt.blockgranites.8", "GRANITE_RED_STONE");
 }
 trait Srgb {
     type Linear;
@@ -341,20 +312,14 @@ pub fn greg_scan_foods() {
         outf.write_str(line[]).unwrap();
     }
 }
-pub fn greg_write_articles() {
-    let lines: Vec<_> = {
-        let file = File::open(&Path::new("work/foodlist.txt"));
-        let mut file = BufferedReader::new(file.unwrap());
-        file.lines().map(|s| s.unwrap()[].trim().into_string()).collect()
-    };
-}
 fn main() {
+    api::api_things();
     // greg_scan_foods();
-    let lang = read_gt_lang();
-    check_lang_dups(&lang);
+    // let lang = read_gt_lang();
+    // check_lang_dups(&lang);
     // render_blocks(&lang);
     // import_special_metaitems(&lang);
     // import_fluids(&lang);
     // tilesheets::update_tilesheet("GT", &[16, 32]);
-    check_navbox();
+    // check_navbox();
 }

@@ -16,7 +16,7 @@ use std::default::Default;
 use std::io::{
     BufferedWriter,
     File,
-    TypeFile,
+    FileType,
 };
 use std::io::fs::{
     readdir,
@@ -84,7 +84,7 @@ impl TilesheetManager {
     fn update(&mut self) {
         let path = Path::new(r"work\tilesheets").join(self.name.as_slice());
         for path in readdir(&path).unwrap().iter() {
-            if stat(path).unwrap().kind != TypeFile { continue }
+            if stat(path).unwrap().kind != FileType::RegularFile { continue }
             if path.extension_str() != Some("png") { continue }
             let name = path.filestem_str().unwrap();
             let img = lodepng::load(path).unwrap();
@@ -106,11 +106,11 @@ impl TilesheetManager {
         let mut file = BufferedWriter::new(File::create(&path).unwrap());
         for (i, tile) in self.entries.iter().enumerate() {
             let (x, y) = ((i % 16) as u32, (i / 16) as u32);
-            (writeln!(file, "{} {} {}", x, y, tile)).unwrap();
+            (writeln!(&mut file, "{} {} {}", x, y, tile)).unwrap();
         }
     }
     fn lookup(&mut self, name: &str) -> (u32, u32) {
-        match self.lookup.find_equiv(name) {
+        match self.lookup.get(name) {
             Some(&x) => return x,
             None => (),
         }
