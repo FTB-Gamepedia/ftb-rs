@@ -11,7 +11,6 @@ use hyper::header::common::{
 use hyper::method::Method;
 use hyper::net::Fresh;
 use serialize::json::{
-    Json,
     decode,
 };
 use std::io::fs::File;
@@ -91,7 +90,7 @@ impl WikiApi {
         println!("Logged in: {}", token);
         api
     }
-    fn get_patrol_token(&self) -> String {
+    pub fn get_patrol_token(&self) -> String {
         #[deriving(Decodable, Show)]
         struct Token {
             tokens: TokenInner,
@@ -108,27 +107,8 @@ impl WikiApi {
         println!("Patrol token: {}", token);
         token
     }
-    fn fix_rc(&self) {
-        let token = self.get_patrol_token();
-        let url = make_url(&[("format", "json"), ("action", "query"), ("list", "recentchanges"), ("rclimit", "1000"), ("rcshow", "!patrolled"), ("rcuser", "Game widow"), ("rcprop", "ids")]);
-        let request = self.make_request(url[], Method::Get);
-        let mut response = request.start().unwrap().send().unwrap();
-        let text = response.read_to_string().unwrap();
-        let stuff: Json = from_str(text[]).unwrap();
-        let changes = stuff.find_path(&["query", "recentchanges"]).unwrap().as_array().unwrap();
-        for change in changes.iter() {
-            let rcid = change.find("rcid").unwrap().as_i64().unwrap();
-            let url = make_url(&[("format", "json"), ("action", "patrol"), ("rcid", rcid.to_string()[]), ("token", token[])]);
-            let request = self.make_request(url[], Method::Post);
-            let mut response = request.start().unwrap().send().unwrap();
-            let text = response.read_to_string().unwrap();
-            println!("{}", text);
-        }
-
-    }
 }
 
 pub fn api_things() {
-    let api = WikiApi::login();
-    api.fix_rc();
+    let _api = WikiApi::login();
 }

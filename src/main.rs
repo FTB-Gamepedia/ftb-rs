@@ -1,6 +1,6 @@
 // Copyright © 2014, Peter Atashian
 
-#![feature(phase, tuple_indexing, associated_types, slicing_syntax, if_let)]
+#![feature(phase, associated_types, slicing_syntax)]
 
 extern crate cookie;
 extern crate hyper;
@@ -15,7 +15,6 @@ extern crate url;
 use image::{
     GenericImage,
     ImageBuf,
-    MutableRefImage,
     Pixel,
     Rgba,
 };
@@ -24,7 +23,6 @@ use std::collections::{
 };
 use std::io::{
     ALL_PERMISSIONS,
-    BufferedReader,
     BufferedWriter,
     File,
     FileType,
@@ -35,8 +33,8 @@ use std::io::fs::{
     mkdir,
     readdir,
     stat,
-    walk_dir,
 };
+use std::io::stdio::stdin;
 use std::num::{
     Float,
     FloatMath,
@@ -118,7 +116,7 @@ pub fn import_special_metaitems(lang: &HashMap<String, String>) {
     let _ = mkdir(&outpath, ALL_PERMISSIONS);
     let import = |category: &str| {
         for path in readdir(&inpath.join(category)).unwrap().iter() {
-            if stat(path).unwrap().kind != FileType::RegularFile { continue }
+            if !path.is_file() { continue }
             if path.extension_str() != Some("png") { continue }
             let stub: u32 = from_str(path.filestem_str().unwrap()).unwrap();
             let rawname = format!("{}.{}.name", category, stub + 32000);
@@ -274,52 +272,35 @@ pub fn check_navbox() {
         }
     }
 }
-pub fn greg_scan_foods() {
-    let scandir = Path::new(r"C:\Users\retep998\Minecraft\Wiki\GT Dev");
-    let mut lines = Vec::new();
-    for p in walk_dir(&scandir).unwrap() {
-        if !p.is_file() || p.extension_str() != Some("java") { continue }
-        let mut inf = BufferedReader::new(File::open(&p).unwrap());
-        for line in inf.lines() {
-            let line = line.unwrap();
-            lines.push(line);
-        }
-    }
-    let namef = File::open(&Path::new("work/foodlist.txt")).unwrap();
-    let mut namef = BufferedReader::new(namef);
-    let mut outf = File::create(&Path::new("work/Food.java")).unwrap();
-    let reg = regex!(r#"addFluid\("([^"]*)""#);
-    let mut found_lines = Vec::new();
-    for name in namef.lines() {
-        let name = name.unwrap();
-        let name = name[].trim();
-        for line in lines.iter() {
-            if line[].contains(name[]) && !line[].contains("TE_Slag") {
-                if let Some(cap) = reg.captures(line[]) {
-                    for line in lines.iter() {
-                        if line[].contains(cap.at(1)) {
-                            found_lines.push(line.clone());
-                        }
-                    }
-                }
-                found_lines.push(line.clone());
-            }
-        }
-    }
-    found_lines.sort();
-    found_lines.dedup();
-    for line in found_lines.iter() {
-        outf.write_str(line[]).unwrap();
+pub fn import_old_tilesheet(name: &str) {
+    let path = Path::new(r"work/tilesheets/import.txt");
+    if stat(&path).map(|s| s.kind != FileType::RegularFile).unwrap_or(true) { return }
+    let mut file = File::open(&path).unwrap();
+    let data = file.read_to_string().unwrap();
+    let name = format!("work/tilesheets/Tilesheet {}.txt", name);
+    let path = Path::new(name[]);
+    let mut out = File::create(&path).unwrap();
+    let reg = regex!(r"Edit	[0-9]+	(.+?)	[A-Z0-9]+	([0-9]+)	([0-9]+)	16px, 32px\r?\n");
+    for cap in reg.captures_iter(data.as_slice()) {
+        let name = cap.at(1);
+        let x = cap.at(2);
+        let y = cap.at(3);
+        (writeln!(&mut out, "{} {} {}", x, y, name)).unwrap();
     }
 }
+
 fn main() {
-    api::api_things();
+    let mut cin = stdin();
+    let blah = cin.read_line().unwrap();
+    let blah = blah[].trim();
+    tilesheets::update_tilesheet(blah, &[16, 32]);
+    // api::api_things();
     // greg_scan_foods();
     // let lang = read_gt_lang();
     // check_lang_dups(&lang);
     // render_blocks(&lang);
     // import_special_metaitems(&lang);
     // import_fluids(&lang);
-    // tilesheets::update_tilesheet("GT", &[16, 32]);
+    // import_old_tilesheet(blah);
     // check_navbox();
 }

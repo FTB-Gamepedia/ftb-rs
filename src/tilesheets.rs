@@ -3,7 +3,6 @@
 use image::{
     GenericImage,
     ImageBuf,
-    MutableRefImage,
     Pixel,
     Rgba,
     SubImage,
@@ -19,8 +18,9 @@ use std::io::{
     FileType,
 };
 use std::io::fs::{
-    readdir,
+    PathExtensions,
     stat,
+    walk_dir,
 };
 use std::mem::swap;
 use {
@@ -83,11 +83,11 @@ impl TilesheetManager {
     }
     fn update(&mut self) {
         let path = Path::new(r"work\tilesheets").join(self.name.as_slice());
-        for path in readdir(&path).unwrap().iter() {
-            if stat(path).unwrap().kind != FileType::RegularFile { continue }
+        for path in walk_dir(&path).unwrap() {
+            if !path.is_file() { continue }
             if path.extension_str() != Some("png") { continue }
             let name = path.filestem_str().unwrap();
-            let img = lodepng::load(path).unwrap();
+            let img = lodepng::load(&path).unwrap();
             let img = decode_srgb(&img);
             let (x, y) = self.lookup(name);
             for tilesheet in self.tilesheets.iter_mut() {
