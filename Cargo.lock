@@ -2,9 +2,8 @@
 name = "ftb"
 version = "0.0.1"
 dependencies = [
- "hyper 0.0.1 (git+https://github.com/retep998/hyper)",
- "image 0.2.0-alpha.2 (git+https://github.com/PistonDevelopers/rust-image)",
- "lodepng 0.0.1 (git+https://github.com/retep998/lodepng-rs)",
+ "hyper 0.0.1 (git+https://github.com/hyperium/hyper)",
+ "image 0.2.0-alpha.2 (git+https://github.com/PistonDevelopers/image)",
 ]
 
 [[package]]
@@ -12,40 +11,41 @@ name = "cookie"
 version = "0.1.0"
 source = "git+https://github.com/alexcrichton/cookie-rs#272ac27b824c008eddd4842239269cb591f93db5"
 dependencies = [
- "openssl 0.2.2 (git+https://github.com/sfackler/rust-openssl)",
+ "openssl 0.2.3 (git+https://github.com/sfackler/rust-openssl)",
  "time 0.1.1 (git+https://github.com/rust-lang/time)",
- "url 0.2.2 (git+https://github.com/servo/rust-url)",
+ "url 0.2.3 (git+https://github.com/servo/rust-url)",
 ]
 
 [[package]]
 name = "gcc"
-version = "0.1.0"
-source = "git+https://github.com/alexcrichton/gcc-rs#3caf7309ef72644cd56a9d3a6f515ae553683176"
+version = "0.1.1"
+source = "git+https://github.com/alexcrichton/gcc-rs#d35c34c871dd75f97fadf04cb0ed85d997a9bc0c"
 
 [[package]]
 name = "hyper"
 version = "0.0.1"
-source = "git+https://github.com/retep998/hyper#00a76cee0339c9306d204c82267543f9da2da4e5"
+source = "git+https://github.com/hyperium/hyper#9e99c57fa8543b86ea479773eb622b1d4f935637"
 dependencies = [
  "cookie 0.1.0 (git+https://github.com/alexcrichton/cookie-rs)",
  "mime 0.0.1 (git+https://github.com/hyperium/mime.rs)",
- "openssl 0.2.2 (git+https://github.com/sfackler/rust-openssl)",
+ "mucell 0.1.2 (git+https://github.com/chris-morgan/mucell)",
+ "openssl 0.2.3 (git+https://github.com/sfackler/rust-openssl)",
  "time 0.1.1 (git+https://github.com/rust-lang/time)",
  "unsafe-any 0.1.1 (git+https://github.com/reem/rust-unsafe-any)",
- "url 0.2.2 (git+https://github.com/servo/rust-url)",
+ "url 0.2.3 (git+https://github.com/servo/rust-url)",
 ]
 
 [[package]]
 name = "image"
 version = "0.2.0-alpha.2"
-source = "git+https://github.com/PistonDevelopers/rust-image#88776a6cfd616a54237381aa1e458dc6e4bcb8ef"
+source = "git+https://github.com/PistonDevelopers/image#e84fc34c571563366c12184dcde473efe8a604a4"
 
 [[package]]
-name = "lodepng"
-version = "0.0.1"
-source = "git+https://github.com/retep998/lodepng-rs#504ffe255aa77bbce5ba4dc5be70650586661586"
+name = "libressl-pnacl-sys"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "image 0.2.0-alpha.2 (git+https://github.com/PistonDevelopers/rust-image)",
+ "pnacl-build-helper 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -54,32 +54,43 @@ version = "0.0.1"
 source = "git+https://github.com/hyperium/mime.rs#7898f1c29c7f5d35d0c3c7aed37ebcfc95a40873"
 
 [[package]]
+name = "mucell"
+version = "0.1.2"
+source = "git+https://github.com/chris-morgan/mucell#d198c6605b3e688719db168db0939051c803b1ea"
+
+[[package]]
 name = "openssl"
-version = "0.2.2"
-source = "git+https://github.com/sfackler/rust-openssl#6cdd2cf577434ca3473c217e8a272ee965ef131f"
+version = "0.2.3"
+source = "git+https://github.com/sfackler/rust-openssl#9754b8e47db5faff2930ed070527d2d71e76e094"
 dependencies = [
- "openssl-sys 0.2.2 (git+https://github.com/sfackler/rust-openssl)",
+ "openssl-sys 0.2.3 (git+https://github.com/sfackler/rust-openssl)",
 ]
 
 [[package]]
 name = "openssl-sys"
-version = "0.2.2"
-source = "git+https://github.com/sfackler/rust-openssl#6cdd2cf577434ca3473c217e8a272ee965ef131f"
+version = "0.2.3"
+source = "git+https://github.com/sfackler/rust-openssl#9754b8e47db5faff2930ed070527d2d71e76e094"
 dependencies = [
- "pkg-config 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libressl-pnacl-sys 2.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "pkg-config 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "pkg-config"
-version = "0.1.0"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "pnacl-build-helper"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "time"
 version = "0.1.1"
-source = "git+https://github.com/rust-lang/time#c1c02adb74c6d9424541ae88ceb61de698b10eeb"
+source = "git+https://github.com/rust-lang/time#288b362e0d3cd9e36a4654c9520e021587f707d1"
 dependencies = [
- "gcc 0.1.0 (git+https://github.com/alexcrichton/gcc-rs)",
+ "gcc 0.1.1 (git+https://github.com/alexcrichton/gcc-rs)",
 ]
 
 [[package]]
@@ -89,6 +100,6 @@ source = "git+https://github.com/reem/rust-unsafe-any#eb3fe87bea85f375b8fcefa0cd
 
 [[package]]
 name = "url"
-version = "0.2.2"
-source = "git+https://github.com/servo/rust-url#bdda3a7bb946e5f85dd3daeefb54c06fffa8350c"
+version = "0.2.3"
+source = "git+https://github.com/servo/rust-url#1c738d2640731f6da58b85bb5a04883b81835b66"
 

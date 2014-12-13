@@ -2,12 +2,12 @@
 
 use image::{
     GenericImage,
-    ImageBuf,
+    ImageBuffer,
     Pixel,
-    Rgba,
+    RgbaImage,
     SubImage,
+    mod,
 };
-use lodepng;
 use std::collections::{
     HashMap,
 };
@@ -15,26 +15,26 @@ use std::default::Default;
 use std::io::{
     BufferedWriter,
     File,
-    FileType,
 };
 use std::io::fs::{
     PathExtensions,
-    stat,
     walk_dir,
 };
 use std::mem::swap;
 use {
-    resize,
-    encode_srgb,
+    FloatImage,
     decode_srgb,
+    encode_srgb,
+    resize,
+    save,
 };
 
 struct Tilesheet {
     size: u32,
-    img: ImageBuf<Rgba<u8>>,
+    img: RgbaImage,
 }
 impl Tilesheet {
-    fn insert(&mut self, x: u32, y: u32, img: &ImageBuf<Rgba<f32>>) {
+    fn insert(&mut self, x: u32, y: u32, img: &FloatImage) {
         let (width, height) = img.dimensions();
         assert!(width == height);
         assert!(x < 16);
@@ -42,13 +42,13 @@ impl Tilesheet {
         let img = encode_srgb(&img);
         let (_, myheight) = self.img.dimensions();
         if (y + 1) * self.size > myheight {
-            let mut img = ImageBuf::new(1, 1);
+            let mut img = ImageBuffer::new(1, 1);
             swap(&mut self.img, &mut img);
-            let mut pixels = img.into_vec();
+            let mut pixels = img.into_raw();
             let len = pixels.len();
             let (w, h) = (self.size * 16, (y + 1) * self.size);
-            pixels.grow((w * h) as uint - len, Default::default());
-            let mut img = ImageBuf::from_pixels(pixels, w, h);
+            pixels.grow((w * h * 4) as uint - len, Default::default());
+            let mut img = ImageBuffer::from_raw(w, h, pixels).unwrap();
             swap(&mut self.img, &mut img);
         }
         let mut sub = SubImage::new(
@@ -56,7 +56,7 @@ impl Tilesheet {
             x * self.size, y * self.size,
             self.size, self.size,
         );
-        for ((_, _, from), (_, _, to)) in img.pixels().zip(sub.pixels_mut()) {
+        for (&from, (_, _, to)) in img.pixels().zip(sub.pixels_mut()) {
             *to = from;
         }
     }
@@ -87,7 +87,7 @@ impl TilesheetManager {
             if !path.is_file() { continue }
             if path.extension_str() != Some("png") { continue }
             let name = path.filestem_str().unwrap();
-            let img = lodepng::load(&path).unwrap();
+            let img = image::open(&path).unwrap().to_rgba();
             let img = decode_srgb(&img);
             let (x, y) = self.lookup(name);
             for tilesheet in self.tilesheets.iter_mut() {
@@ -99,7 +99,7 @@ impl TilesheetManager {
         for tilesheet in self.tilesheets.iter() {
             let name = format!("Tilesheet {} {}.png", self.name, tilesheet.size);
             let path = Path::new(r"work\tilesheets").join(name.as_slice());
-            lodepng::save(&tilesheet.img, &path).unwrap();
+            save(&tilesheet.img, &path);
         }
         let name = format!("Tilesheet {}.txt", self.name);
         let path = Path::new(r"work\tilesheets").join(name.as_slice());
@@ -163,9 +163,9 @@ fn load_entries(tiles: &HashMap<String, (u32, u32)>) -> Vec<String> {
 fn load_tilesheet(name: &str, size: u32) -> Tilesheet {
     let name = format!("Tilesheet {} {}.png", name, size);
     let path = Path::new(r"work\tilesheets").join(name.as_slice());
-    let img = match lodepng::load(&path) {
-        Ok(img) => img,
-        Err(_) => ImageBuf::new(size * 16, size),
+    let img = match image::open(&path) {
+        Ok(img) => img.to_rgba(),
+        Err(_) => ImageBuffer::new(size * 16, size),
     };
     let (width, _) = img.dimensions();
     assert!(width == size * 16);
@@ -175,7 +175,11 @@ fn load_tilesheets(name: &str, sizes: &[u32]) -> Vec<Tilesheet> {
     sizes.iter().map(|&size| load_tilesheet(name, size)).collect()
 }
 pub fn update_tilesheet(name: &str, sizes: &[u32]) {
+    println!("Loading tilesheet");
     let mut manager = TilesheetManager::new(name, sizes);
+    println!("Updating tilesheet");
     manager.update();
+    println!("Saving tilesheet");
     manager.save();
+    println!("Done");
 }

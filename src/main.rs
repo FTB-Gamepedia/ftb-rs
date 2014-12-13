@@ -5,7 +5,6 @@
 extern crate cookie;
 extern crate hyper;
 extern crate image;
-extern crate lodepng;
 #[phase(plugin)]
 extern crate regex_macros;
 extern crate regex;
@@ -14,10 +13,12 @@ extern crate url;
 
 use image::{
     GenericImage,
-    ImageBuf,
+    ImageBuffer,
     Pixel,
     Rgba,
+    RgbaImage,
 };
+use image::ColorType::RGBA;
 use std::collections::{
     HashMap,
 };
@@ -34,7 +35,10 @@ use std::io::fs::{
     readdir,
     stat,
 };
-use std::io::stdio::stdin;
+use std::io::stdio::{
+    flush,
+    stdin,
+};
 use std::num::{
     Float,
     FloatMath,
@@ -42,6 +46,11 @@ use std::num::{
 
 pub mod tilesheets;
 pub mod api;
+
+type FloatImage = ImageBuffer<Vec<f32>, f32, Rgba<f32>>;
+pub fn save(img: &RgbaImage, path: &Path) {
+    image::save_buffer(path, img.as_slice(), img.width(), img.height(), RGBA(8)).unwrap();
+}
 
 pub fn dump_descriptions() {
     let path = Path::new(r"C:\Users\retep998\Minecraft\Wiki\GT Lang\GregTech.lang");
@@ -111,6 +120,8 @@ pub fn read_gt_lang() -> HashMap<String, String> {
     ).collect()
 }
 pub fn import_special_metaitems(lang: &HashMap<String, String>) {
+    print!("Importing special metaitems... ");
+    flush();
     let inpath = Path::new(r"work\assets\gt\gregtech\textures\items");
     let outpath = Path::new(r"work\tilesheets\GT");
     let _ = mkdir(&outpath, ALL_PERMISSIONS);
@@ -130,13 +141,16 @@ pub fn import_special_metaitems(lang: &HashMap<String, String>) {
     };
     import("gt.metaitem.01");
     import("gt.metaitem.02");
+    println!(" done!");
 }
 pub fn import_fluids(lang: &HashMap<String, String>) {
+    print!("Importing fluids... ");
+    flush();
     let inpath = Path::new(r"work\assets\gt\gregtech\textures\blocks\fluids");
     let outpath = Path::new(r"work\tilesheets\GT");
     let _ = mkdir(&outpath, ALL_PERMISSIONS);
     for path in readdir(&inpath).unwrap().iter() {
-        if stat(path).unwrap().kind != FileType::RegularFile { continue }
+        if !path.is_file() { continue }
         if path.extension_str() != Some("png") { continue }
         let stub = path.filestem_str().unwrap();
         let name = match lang.get(stub) {
@@ -146,13 +160,14 @@ pub fn import_fluids(lang: &HashMap<String, String>) {
         let name = format!("{} (Fluid)", name);
         let mut out = outpath.join(name.as_slice());
         out.set_extension("png");
-        let img = lodepng::load(path).unwrap();
-        let (w, _) = img.dimensions();
+        let img = image::open(path).unwrap().to_rgba();
+        let w = img.width();
         let mut pixels = img.into_vec();
-        pixels.truncate(w as uint * w as uint);
-        let img = ImageBuf::from_pixels(pixels, w, w);
-        lodepng::save(&img, &out).unwrap();
+        pixels.truncate((w * w * 4) as uint);
+        let img = ImageBuffer::from_raw(w, w, pixels).unwrap();
+        save(&img, &out);
     }
+    println!(" done!");
 }
 trait Srgb {
     type Linear;
@@ -169,74 +184,71 @@ impl Srgb for Rgba<u8> {
                 ((x + 0.055) / (1. + 0.055)).powf(2.4)
             }
         }
-        let p = Rgba(dec(self.0), dec(self.1), dec(self.2), dec(self.3));
-        Rgba(p.0 * p.3, p.1 * p.3, p.2 * p.3, p.3)
+        let p = Rgba([dec(self[0]), dec(self[1]), dec(self[2]), dec(self[3])]);
+        Rgba([p[0] * p[3], p[1] * p[3], p[2] * p[3], p[3]])
     }
 }
-fn decode_srgb(img: &ImageBuf<Rgba<u8>>) -> ImageBuf<Rgba<f32>> {
+fn decode_srgb(img: &RgbaImage) -> FloatImage {
     let (w, h) = img.dimensions();
-    let pix = img.pixelbuf().iter().map(|p| p.decode()).collect();
-    ImageBuf::from_pixels(pix, w, h)
+    ImageBuffer::from_fn(w, h, |x, y| img[(x, y)].decode())
 }
 trait Linear {
     type Srgb;
     fn encode(&self) -> <Self as Linear>::Srgb;
 }
-fn encode_srgb(img: &ImageBuf<Rgba<f32>>) -> ImageBuf<Rgba<u8>> {
-    fn encode(x: f32) -> u8 {
-        let x = if x <= 0.0031308 {
-            x * 12.92
+impl Linear for Rgba<f32> {
+    type Srgb = Rgba<u8>;
+    fn encode(&self) -> Rgba<u8> {
+        fn enc(x: f32) -> u8 {
+            let x = if x <= 0.0031308 {
+                x * 12.92
+            } else {
+                x.powf(1. / 2.4) * (1. + 0.055) - 0.055
+            };
+            (x * 255.).round().max(0.).min(255.) as u8
+        }
+        let p = if self[3] > 0.0001 {
+            Rgba([self[0] / self[3], self[1] / self[3], self[2] / self[3], self[3]])
         } else {
-            x.powf(1. / 2.4) * (1. + 0.055) - 0.055
+            Rgba([0., 0., 0., 0.])
         };
-        (x * 255.).round().max(0.).min(255.) as u8
+        Rgba([enc(p[0]), enc(p[1]), enc(p[2]), enc(p[3])])
     }
-    let (w, h) = img.dimensions();
-    let pix = img.pixelbuf().iter().map(|p| {
-        let p = if p.3 > 0.0001 {
-            Rgba(p.0 / p.3, p.1 / p.3, p.2 / p.3, p.3)
-        } else {
-            Rgba(0., 0., 0., 0.)
-        };
-        Rgba(encode(p.0), encode(p.1), encode(p.2), encode(p.3))
-    }).collect();
-    ImageBuf::from_pixels(pix, w, h)
 }
-
-fn resize(img: &ImageBuf<Rgba<f32>>, width: u32, height: u32) -> ImageBuf<Rgba<f32>> {
+fn encode_srgb(img: &FloatImage) -> RgbaImage {
+    let (w, h) = img.dimensions();
+    ImageBuffer::from_fn(w, h, |x, y| img[(x, y)].encode())
+}
+fn resize(img: &FloatImage, width: u32, height: u32) -> FloatImage {
     let (w, h) = img.dimensions();
     assert!(width.cmp(&w) == height.cmp(&h));
     if width < w {
-        let mut new = ImageBuf::new(width, height);
         let (rw, rh) = (w as f32 / (width as f32), h as f32 / (height as f32));
-        for (x, y, pixel) in new.pixels_mut() {
+        ImageBuffer::from_fn(width, height, |x, y| {
             let (x1, x2) = ((x as f32 * rw) as u32, ((x + 1) as f32 * rw) as u32);
             let (y1, y2) = ((y as f32 * rh) as u32, ((y + 1) as f32 * rh) as u32);
             let (mut r, mut g, mut b, mut a) = (0., 0., 0., 0.);
             for xx in range(x1, x2) {
                 for yy in range(y1, y2) {
-                    let p = img.get_pixel(xx, yy);
-                    r += p.0;
-                    g += p.1;
-                    b += p.2;
-                    a += p.3;
+                    let p = img[(xx, yy)];
+                    r += p[0];
+                    g += p[1];
+                    b += p[2];
+                    a += p[3];
                 }
             }
             let m = 1. / (((x2 - x1) * (y2 - y1)) as f32);
-            *pixel = Rgba(r * m, g * m, b * m, a * m);
-        }
-        new
+            Rgba([r * m, g * m, b * m, a * m])
+        })
     } else if width == w {
         img.clone()
     } else {
-        let mut new = ImageBuf::new(width, height);
         let (rw, rh) = (w as f32 / (width as f32), h as f32 / (height as f32));
-        for (x, y, pixel) in new.pixels_mut() {
+        ImageBuffer::from_fn(width, height, |x, y| {
             let xx = (x as f32 * rw) as u32;
             let yy = (y as f32 * rh) as u32;
-            *pixel = img.get_pixel(xx, yy);
-        }
-        new
+            img[(xx, yy)]
+        })
     }
 }
 
@@ -291,16 +303,17 @@ pub fn import_old_tilesheet(name: &str) {
 
 fn main() {
     let mut cin = stdin();
+    print!("Mod name: ");
+    flush();
     let blah = cin.read_line().unwrap();
     let blah = blah[].trim();
     tilesheets::update_tilesheet(blah, &[16, 32]);
     // api::api_things();
     // greg_scan_foods();
     // let lang = read_gt_lang();
-    // check_lang_dups(&lang);
-    // render_blocks(&lang);
     // import_special_metaitems(&lang);
     // import_fluids(&lang);
+    // check_lang_dups(&lang);
     // import_old_tilesheet(blah);
     // check_navbox();
 }

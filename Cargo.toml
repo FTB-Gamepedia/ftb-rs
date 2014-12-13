@@ -5,10 +5,7 @@ version = "0.0.1"
 authors = ["Peter Atashian <retep998@gmail.com>"]
 
 [dependencies.image]
-git = "https://github.com/PistonDevelopers/rust-image"
-
-[dependencies.lodepng]
-git = "https://github.com/retep998/lodepng-rs"
+git = "https://github.com/PistonDevelopers/image"
 
 [dependencies.hyper]
-git = "https://github.com/retep998/hyper"
+git = "https://github.com/hyperium/hyper"

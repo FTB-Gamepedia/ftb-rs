@@ -90,7 +90,8 @@ impl WikiApi {
         println!("Logged in: {}", token);
         api
     }
-    pub fn get_patrol_token(&self) -> String {
+    #[allow(dead_code)]
+    fn get_patrol_token(&self) -> String {
         #[deriving(Decodable, Show)]
         struct Token {
             tokens: TokenInner,
