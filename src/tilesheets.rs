@@ -103,7 +103,9 @@ impl TilesheetManager {
         let name = format!("Tilesheet {}.txt", self.name);
         let path = Path::new(r"work\tilesheets").join(name.as_slice());
         let mut file = BufferedWriter::new(File::create(&path).unwrap());
-        for (&(x, y), tile) in self.entries.iter() {
+        let mut stuff = self.entries.iter().map(|(&(x, y), tile)| (x, y, tile)).collect::<Vec<_>>();
+        stuff.sort_by(|a, b| if a.1.cmp(&b.1) == Equal { a.0.cmp(&b.0) } else { a.1.cmp(&b.1) });
+        for &(x, y, tile) in stuff.iter() {
             (writeln!(&mut file, "{} {} {}", x, y, tile)).unwrap();
         }
     }
