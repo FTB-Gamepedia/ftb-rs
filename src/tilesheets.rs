@@ -8,9 +8,8 @@ use image::{
     SubImage,
     mod,
 };
-use std::collections::{
-    HashMap,
-};
+use std::cmp::max;
+use std::collections::HashMap;
 use std::default::Default;
 use std::io::{
     BufferedWriter,
@@ -34,22 +33,22 @@ struct Tilesheet {
     img: RgbaImage,
 }
 impl Tilesheet {
+    fn grow(&mut self, w: u32, h: u32) {
+        let mut img = ImageBuffer::new(w, h);
+        for (x, y, &pix) in self.img.enumerate_pixels() {
+            img.put_pixel(x, y, pix);
+        }
+        swap(&mut self.img, &mut img);
+    }
     fn insert(&mut self, x: u32, y: u32, img: &FloatImage) {
         let (width, height) = img.dimensions();
         assert!(width == height);
-        assert!(x < 16);
         let img = resize(img, self.size, self.size);
         let img = encode_srgb(&img);
-        let (_, myheight) = self.img.dimensions();
-        if (y + 1) * self.size > myheight {
-            let mut img = ImageBuffer::new(1, 1);
-            swap(&mut self.img, &mut img);
-            let mut pixels = img.into_raw();
-            let len = pixels.len();
-            let (w, h) = (self.size * 16, (y + 1) * self.size);
-            pixels.grow((w * h * 4) as uint - len, Default::default());
-            let mut img = ImageBuffer::from_raw(w, h, pixels).unwrap();
-            swap(&mut self.img, &mut img);
+        let (w, h) = self.img.dimensions();
+        if (x + 1) * self.size > w || (y + 1) * self.size > h {
+            let (nw, nh) = (max((x + 1) * self.size, w), max((y + 1) * self.size, h));
+            self.grow(nw, nh)
         }
         let mut sub = SubImage::new(
             &mut self.img,
@@ -64,9 +63,9 @@ impl Tilesheet {
 struct TilesheetManager {
     name: String,
     lookup: HashMap<String, (u32, u32)>,
-    entries: Vec<String>,
+    entries: HashMap<(u32, u32), String>,
     tilesheets: Vec<Tilesheet>,
-    unused: uint,
+    next: (u32, u32),
 }
 impl TilesheetManager {
     fn new(name: &str, sizes: &[u32]) -> TilesheetManager {
@@ -78,7 +77,7 @@ impl TilesheetManager {
             lookup: lookup,
             entries: entries,
             tilesheets: tilesheets,
-            unused: 0,
+            next: (0, 0),
         }
     }
     fn update(&mut self) {
@@ -104,9 +103,22 @@ impl TilesheetManager {
         let name = format!("Tilesheet {}.txt", self.name);
         let path = Path::new(r"work\tilesheets").join(name.as_slice());
         let mut file = BufferedWriter::new(File::create(&path).unwrap());
-        for (i, tile) in self.entries.iter().enumerate() {
-            let (x, y) = ((i % 16) as u32, (i / 16) as u32);
+        for (&(x, y), tile) in self.entries.iter() {
             (writeln!(&mut file, "{} {} {}", x, y, tile)).unwrap();
+        }
+    }
+    fn increment(&mut self) {
+        self.next.1 += 1;
+        if self.next.1 > self.next.0 * 2 {
+            self.next.0 += 1;
+            self.next.1 = 0;
+        }
+    }
+    fn next_pos(&self) -> (u32, u32) {
+        if self.next.1 < self.next.0 {
+            (self.next.1, self.next.0)
+        } else {
+            (self.next.0, self.next.1 - self.next.0)
         }
     }
     fn lookup(&mut self, name: &str) -> (u32, u32) {
@@ -114,20 +126,13 @@ impl TilesheetManager {
             Some(&x) => return x,
             None => (),
         }
-        for i in range(self.unused, self.entries.len()) {
-            if self.entries[i].as_slice() != "" { continue }
-            self.entries[i] = name.into_string();
-            self.unused = i;
-            let (x, y) = ((i % 16) as u32, (i / 16) as u32);
-            self.lookup.insert(name.into_string(), (x, y));
-            return (x, y);
+        while self.entries.get(&self.next_pos()).is_some() {
+            self.increment();
         }
-        let i = self.entries.len();
-        self.entries.push(name.into_string());
-        self.unused = i;
-        let (x, y) = ((i % 16) as u32, (i / 16) as u32);
-        self.lookup.insert(name.into_string(), (x, y));
-        (x, y)
+        let pos = self.next_pos();
+        self.lookup.insert(name.into_string(), pos);
+        self.entries.insert(pos, name.into_string());
+        pos
     }
 }
 fn load_tiles(name: &str) -> HashMap<String, (u32, u32)> {
@@ -149,26 +154,16 @@ fn load_tiles(name: &str) -> HashMap<String, (u32, u32)> {
         (name, (x, y))
     }).collect()
 }
-fn load_entries(tiles: &HashMap<String, (u32, u32)>) -> Vec<String> {
-    let mut entries = Vec::new();
-    for (name, &(x, y)) in tiles.iter() {
-        let index = y as uint * 16 + x as uint;
-        let len = entries.len();
-        if index >= len { entries.grow(index + 1 - len, String::new()) }
-        assert!(entries[index].as_slice() == "");
-        entries[index] = name.clone();
-    }
-    entries
+fn load_entries(tiles: &HashMap<String, (u32, u32)>) -> HashMap<(u32, u32), String> {
+    tiles.iter().map(|(key, value)| (value.clone(), key.clone())).collect()
 }
 fn load_tilesheet(name: &str, size: u32) -> Tilesheet {
     let name = format!("Tilesheet {} {}.png", name, size);
     let path = Path::new(r"work\tilesheets").join(name.as_slice());
     let img = match image::open(&path) {
         Ok(img) => img.to_rgba(),
-        Err(_) => ImageBuffer::new(size * 16, size),
+        Err(_) => ImageBuffer::new(size, size),
     };
-    let (width, _) = img.dimensions();
-    assert!(width == size * 16);
     Tilesheet { size: size, img: img }
 }
 fn load_tilesheets(name: &str, sizes: &[u32]) -> Vec<Tilesheet> {

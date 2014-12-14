@@ -26,14 +26,12 @@ use std::io::{
     ALL_PERMISSIONS,
     BufferedWriter,
     File,
-    FileType,
 };
 use std::io::fs::{
     PathExtensions,
     copy,
     mkdir,
     readdir,
-    stat,
 };
 use std::io::stdio::{
     flush,
@@ -256,7 +254,8 @@ pub fn check_lang_dups(lang: &HashMap<String, String>) {
     let mut stuff = HashMap::new();
     for (key, val) in lang.iter() {
         if key.as_slice().contains(".tooltip") { continue }
-        if !key.as_slice().contains(".metaitem") { continue }
+        if key.as_slice().contains("fluid.") { continue }
+        if key.as_slice().contains("DESCRIPTION") { continue }
         match stuff.get(val) {
             Some(other) => {
                 println!("Collision for {}", val);
@@ -286,19 +285,39 @@ pub fn check_navbox() {
 }
 pub fn import_old_tilesheet(name: &str) {
     let path = Path::new(r"work/tilesheets/import.txt");
-    if stat(&path).map(|s| s.kind != FileType::RegularFile).unwrap_or(true) { return }
+    if !path.is_file() { return }
+    println!("Importing old tilesheet");
     let mut file = File::open(&path).unwrap();
     let data = file.read_to_string().unwrap();
     let name = format!("work/tilesheets/Tilesheet {}.txt", name);
     let path = Path::new(name[]);
     let mut out = File::create(&path).unwrap();
-    let reg = regex!(r"Edit	[0-9]+	(.+?)	[A-Z0-9]+	([0-9]+)	([0-9]+)	16px, 32px\r?\n");
+    let reg = regex!(r"Edit\s+[0-9]+\s+(.+?)\s+[A-Z0-9]+\s+([0-9]+)\s+([0-9]+)\s+16px, 32px\r?\n");
     for cap in reg.captures_iter(data.as_slice()) {
         let name = cap.at(1);
         let x = cap.at(2);
         let y = cap.at(3);
         (writeln!(&mut out, "{} {} {}", x, y, name)).unwrap();
     }
+}
+pub fn fix_lang() {
+    let path = Path::new(r"work/GregTech.lang");
+    let mut file = File::open(&path).unwrap();
+    let data = file.read_to_string().unwrap();
+    let data = regex!("\r").replace_all(data[], "");
+    let data = regex!("(blockores\\.[0-9]{1,3}\\.name=.*)").replace_all(data[], "$1 (Stone)");
+    let data = regex!("(blockores\\.1[0-9]{3}\\.name=.*)").replace_all(data[], "$1 (Netherrack)");
+    let data = regex!("(blockores\\.2[0-9]{3}\\.name=.*)").replace_all(data[], "$1 (Endstone)");
+    let data = regex!("(blockores\\.3[0-9]{3}\\.name=.*)").replace_all(data[], "$1 (Black Granite)");
+    let data = regex!("(blockores\\.4[0-9]{3}\\.name=.*)").replace_all(data[], "$1 (Red Granite)");
+    let data = regex!("(blockores\\.16[0-9]{3}\\.name=.*)").replace_all(data[], "$1 (Stone)");
+    let data = regex!("(blockores\\.17[0-9]{3}\\.name=.*)").replace_all(data[], "$1 (Netherrack)");
+    let data = regex!("(blockores\\.18[0-9]{3}\\.name=.*)").replace_all(data[], "$1 (Endstone)");
+    let data = regex!("(blockores\\.19[0-9]{3}\\.name=.*)").replace_all(data[], "$1 (Black Granite)");
+    let data = regex!("(blockores\\.20[0-9]{3}\\.name=.*)").replace_all(data[], "$1 (Red Granite)");
+    let path = Path::new(r"work/modified.lang");
+    let mut file = File::create(&path).unwrap();
+    file.write_str(data[]).unwrap();
 }
 
 fn main() {
@@ -307,13 +326,14 @@ fn main() {
     flush();
     let blah = cin.read_line().unwrap();
     let blah = blah[].trim();
+    // import_old_tilesheet(blah);
     tilesheets::update_tilesheet(blah, &[16, 32]);
     // api::api_things();
     // greg_scan_foods();
+    // fix_lang();
     // let lang = read_gt_lang();
     // import_special_metaitems(&lang);
     // import_fluids(&lang);
     // check_lang_dups(&lang);
-    // import_old_tilesheet(blah);
     // check_navbox();
 }
