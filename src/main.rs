@@ -57,9 +57,9 @@ pub fn dump_descriptions() {
     let reg = regex!(r"S:TileEntity_DESCRIPTION_(\d+)_([0-9A-Za-z_]+)=(.+?)\r?\n");
     let mut descs = Vec::new();
     for cap in reg.captures_iter(data.as_slice()) {
-        let index: i32 = from_str(cap.at(1)).unwrap();
-        let name = cap.at(2);
-        let desc = cap.at(3);
+        let index: i32 = from_str(cap.at(1).unwrap()).unwrap();
+        let name = cap.at(2).unwrap();
+        let desc = cap.at(3).unwrap();
         descs.push((index, name, desc));
     }
     descs.sort_by(|&(a, _, _), &(b, _, _)| a.cmp(&b));
@@ -114,7 +114,7 @@ pub fn read_gt_lang() -> HashMap<String, String> {
     let data = file.read_to_string().unwrap();
     let reg = regex!(r"S:([\w\.]+?)=(.+?)\r?\n");
     reg.captures_iter(data.as_slice()).map(|cap|
-        (cap.at(1).into_string(), cap.at(2).into_string())
+        (cap.at(1).unwrap().into_string(), cap.at(2).unwrap().into_string())
     ).collect()
 }
 pub fn import_special_metaitems(lang: &HashMap<String, String>) {

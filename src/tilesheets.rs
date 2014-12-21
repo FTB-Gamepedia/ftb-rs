@@ -5,12 +5,12 @@ use image::{
     ImageBuffer,
     Pixel,
     RgbaImage,
-    SubImage,
     mod,
 };
 use std::cmp::max;
-use std::collections::HashMap;
-use std::default::Default;
+use std::collections::{
+    HashMap,
+};
 use std::io::{
     BufferedWriter,
     File,
@@ -50,13 +50,9 @@ impl Tilesheet {
             let (nw, nh) = (max((x + 1) * self.size, w), max((y + 1) * self.size, h));
             self.grow(nw, nh)
         }
-        let mut sub = SubImage::new(
-            &mut self.img,
-            x * self.size, y * self.size,
-            self.size, self.size,
-        );
-        for (&from, (_, _, to)) in img.pixels().zip(sub.pixels_mut()) {
-            *to = from;
+        let (x, y) = (x * self.size, y * self.size);
+        for (xx, yy, &pix) in img.enumerate_pixels() {
+            self.img.put_pixel(x + xx, y + yy, pix);
         }
     }
 }
@@ -150,9 +146,9 @@ fn load_tiles(name: &str) -> HashMap<String, (u32, u32)> {
     };
     let data = file.read_to_string().unwrap();
     reg.captures_iter(data.as_slice()).map(|cap| {
-        let x = from_str(cap.at(1)).unwrap();
-        let y = from_str(cap.at(2)).unwrap();
-        let name = cap.at(3).into_string();
+        let x = from_str(cap.at(1).unwrap()).unwrap();
+        let y = from_str(cap.at(2).unwrap()).unwrap();
+        let name = cap.at(3).unwrap().into_string();
         (name, (x, y))
     }).collect()
 }
