@@ -15,9 +15,8 @@ use image::{GenericImage, ImageBuffer, Pixel, Rgba, RgbaImage};
 use image::ColorType::RGBA;
 use std::borrow::ToOwned;
 use std::collections::HashMap;
-use std::io::{ALL_PERMISSIONS, BufferedWriter, File};
-use std::io::fs::{PathExtensions, copy, mkdir, readdir};
-use std::io::stdio::{flush, stdin};
+use std::io::File;
+use std::io::fs::PathExtensions;
 use std::num::{Float, FloatMath};
 
 pub mod tilesheets;
@@ -27,64 +26,6 @@ pub fn save(img: &RgbaImage, path: &Path) {
     image::save_buffer(path, img.as_slice(), img.width(), img.height(), RGBA(8)).unwrap();
 }
 
-pub fn dump_descriptions() {
-    let path = Path::new(r"C:\Users\retep998\Minecraft\Wiki\GT Lang\GregTech.lang");
-    let mut file = File::open(&path).unwrap();
-    let data = file.read_to_string().unwrap();
-    let reg = regex!(r"S:TileEntity_DESCRIPTION_(\d+)_([0-9A-Za-z_]+)=(.+?)\r?\n");
-    let mut descs = Vec::new();
-    for cap in reg.captures_iter(data.as_slice()) {
-        let index: i32 = cap.at(1).unwrap().parse().unwrap();
-        let name = cap.at(2).unwrap();
-        let desc = cap.at(3).unwrap();
-        descs.push((index, name, desc));
-    }
-    descs.sort_by(|&(a, _, _), &(b, _, _)| a.cmp(&b));
-    let mut file = BufferedWriter::new(File::create(&Path::new("descriptions.txt")).unwrap());
-    for desc in descs.iter() {
-        let &(index, name, desc) = desc;
-        (write!(&mut file, "{},{},", index, name)).unwrap();
-        let mut color = false;
-        let mut code = false;
-        for c in desc.chars() {
-            match code {
-                true => {
-                    code = false;
-                    if color { file.write_str("}}").unwrap() }
-                    color = true;
-                    match c {
-                        '0' => file.write_str("{{Color|000000|").unwrap(),
-                        '1' => file.write_str("{{Color|0000AA|").unwrap(),
-                        '2' => file.write_str("{{Color|00AA00|").unwrap(),
-                        '3' => file.write_str("{{Color|00AAAA|").unwrap(),
-                        '4' => file.write_str("{{Color|AA0000|").unwrap(),
-                        '5' => file.write_str("{{Color|AA00AA|").unwrap(),
-                        '6' => file.write_str("{{Color|FFAA00|").unwrap(),
-                        '7' => file.write_str("{{Color|AAAAAA|").unwrap(),
-                        '8' => file.write_str("{{Color|555555|").unwrap(),
-                        '9' => file.write_str("{{Color|5555FF|").unwrap(),
-                        'a' => file.write_str("{{Color|55FF55|").unwrap(),
-                        'b' => file.write_str("{{Color|55FFFF|").unwrap(),
-                        'c' => file.write_str("{{Color|FF5555|").unwrap(),
-                        'd' => file.write_str("{{Color|FF55FF|").unwrap(),
-                        'e' => file.write_str("{{Color|FFFF55|").unwrap(),
-                        'f' => file.write_str("{{Color|FFFFFF|").unwrap(),
-                        'r' => color = false,
-                        _ => println!("Unknown: {}", c),
-                    }
-                },
-                false => {
-                    match c {
-                        '§' => code = true,
-                        c => file.write_char(c).unwrap(),
-                    }
-                },
-            }
-        }
-        if color { file.write_str("}}").unwrap() }
-        file.write_line("").unwrap();
-    }
-}
 pub fn read_gt_lang() -> HashMap<String, String> {
     let path = Path::new(r"work/GregTech.lang");
     let mut file = File::open(&path).unwrap();
@@ -93,56 +34,6 @@ pub fn read_gt_lang() -> HashMap<String, String> {
     reg.captures_iter(data.as_slice()).map(|cap|
         (cap.at(1).unwrap().to_owned(), cap.at(2).unwrap().to_owned())
     ).collect()
-}
-pub fn import_special_metaitems(lang: &HashMap<String, String>) {
-    print!("Importing special metaitems... ");
-    flush();
-    let inpath = Path::new(r"work\assets\gt\gregtech\textures\items");
-    let outpath = Path::new(r"work\tilesheets\GT");
-    let _ = mkdir(&outpath, ALL_PERMISSIONS);
-    let import = |category: &str| {
-        for path in readdir(&inpath.join(category)).unwrap().iter() {
-            if !path.is_file() { continue }
-            if path.extension_str() != Some("png") { continue }
-            let stub: u32 = path.filestem_str().unwrap().parse().unwrap();
-            let rawname = format!("{}.{}.name", category, stub + 32000);
-            let name = match lang.get(&rawname) {
-                Some(s) => format!("{}.png", s),
-                None => continue,
-            };
-            let out = outpath.join(name[]);
-            copy(path, &out).unwrap();
-        }
-    };
-    import("gt.metaitem.01");
-    import("gt.metaitem.02");
-    println!(" done!");
-}
-pub fn import_fluids(lang: &HashMap<String, String>) {
-    print!("Importing fluids... ");
-    flush();
-    let inpath = Path::new(r"work\assets\gt\gregtech\textures\blocks\fluids");
-    let outpath = Path::new(r"work\tilesheets\GT");
-    let _ = mkdir(&outpath, ALL_PERMISSIONS);
-    for path in readdir(&inpath).unwrap().iter() {
-        if !path.is_file() { continue }
-        if path.extension_str() != Some("png") { continue }
-        let stub = path.filestem_str().unwrap();
-        let name = match lang.get(stub) {
-            Some(s) => s,
-            None => continue,
-        };
-        let name = format!("{} (Fluid)", name);
-        let mut out = outpath.join(name.as_slice());
-        out.set_extension("png");
-        let img = image::open(path).unwrap().to_rgba();
-        let w = img.width();
-        let mut pixels = img.into_vec();
-        pixels.truncate((w * w * 4) as uint);
-        let img = ImageBuffer::from_raw(w, w, pixels).unwrap();
-        save(&img, &out);
-    }
-    println!(" done!");
 }
 trait Srgb {
     type Linear;
@@ -298,19 +189,10 @@ pub fn fix_lang() {
 }
 
 fn main() {
-    let mut cin = stdin();
-    print!("Mod name: ");
-    flush();
-    let blah = cin.read_line().unwrap();
-    let blah = blah[].trim();
-    // import_old_tilesheet(blah);
-    tilesheets::update_tilesheet(blah, &[16, 32]);
-    // api::api_things();
-    // greg_scan_foods();
-    // fix_lang();
-    // let lang = read_gt_lang();
-    // import_special_metaitems(&lang);
-    // import_fluids(&lang);
-    // check_lang_dups(&lang);
-    // check_navbox();
+    let args = std::os::args();
+    let args = args.iter().map(|x| x[]).collect::<Vec<_>>();
+    match args[] {
+        [_, "update", name] => tilesheets::update_tilesheet(name[], &[16, 32]),
+        _ => println!("Invalid arguments"),
+    }
 }
