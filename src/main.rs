@@ -8,42 +8,19 @@ extern crate image;
 #[phase(plugin)]
 extern crate regex_macros;
 extern crate regex;
-extern crate serialize;
+extern crate "rustc-serialize" as serialize;
 extern crate url;
 
-use image::{
-    GenericImage,
-    ImageBuffer,
-    Pixel,
-    Rgba,
-    RgbaImage,
-};
+use image::{GenericImage, ImageBuffer, Pixel, Rgba, RgbaImage};
 use image::ColorType::RGBA;
-use std::collections::{
-    HashMap,
-};
-use std::io::{
-    ALL_PERMISSIONS,
-    BufferedWriter,
-    File,
-};
-use std::io::fs::{
-    PathExtensions,
-    copy,
-    mkdir,
-    readdir,
-};
-use std::io::stdio::{
-    flush,
-    stdin,
-};
-use std::num::{
-    Float,
-    FloatMath,
-};
+use std::borrow::ToOwned;
+use std::collections::HashMap;
+use std::io::{ALL_PERMISSIONS, BufferedWriter, File};
+use std::io::fs::{PathExtensions, copy, mkdir, readdir};
+use std::io::stdio::{flush, stdin};
+use std::num::{Float, FloatMath};
 
 pub mod tilesheets;
-pub mod api;
 
 type FloatImage = ImageBuffer<Vec<f32>, f32, Rgba<f32>>;
 pub fn save(img: &RgbaImage, path: &Path) {
@@ -57,7 +34,7 @@ pub fn dump_descriptions() {
     let reg = regex!(r"S:TileEntity_DESCRIPTION_(\d+)_([0-9A-Za-z_]+)=(.+?)\r?\n");
     let mut descs = Vec::new();
     for cap in reg.captures_iter(data.as_slice()) {
-        let index: i32 = from_str(cap.at(1).unwrap()).unwrap();
+        let index: i32 = cap.at(1).unwrap().parse().unwrap();
         let name = cap.at(2).unwrap();
         let desc = cap.at(3).unwrap();
         descs.push((index, name, desc));
@@ -114,7 +91,7 @@ pub fn read_gt_lang() -> HashMap<String, String> {
     let data = file.read_to_string().unwrap();
     let reg = regex!(r"S:([\w\.]+?)=(.+?)\r?\n");
     reg.captures_iter(data.as_slice()).map(|cap|
-        (cap.at(1).unwrap().into_string(), cap.at(2).unwrap().into_string())
+        (cap.at(1).unwrap().to_owned(), cap.at(2).unwrap().to_owned())
     ).collect()
 }
 pub fn import_special_metaitems(lang: &HashMap<String, String>) {
@@ -127,7 +104,7 @@ pub fn import_special_metaitems(lang: &HashMap<String, String>) {
         for path in readdir(&inpath.join(category)).unwrap().iter() {
             if !path.is_file() { continue }
             if path.extension_str() != Some("png") { continue }
-            let stub: u32 = from_str(path.filestem_str().unwrap()).unwrap();
+            let stub: u32 = path.filestem_str().unwrap().parse().unwrap();
             let rawname = format!("{}.{}.name", category, stub + 32000);
             let name = match lang.get(&rawname) {
                 Some(s) => format!("{}.png", s),

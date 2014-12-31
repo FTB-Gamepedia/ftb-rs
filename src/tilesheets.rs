@@ -7,18 +7,11 @@ use image::{
     RgbaImage,
     mod,
 };
+use std::borrow::ToOwned;
 use std::cmp::max;
-use std::collections::{
-    HashMap,
-};
-use std::io::{
-    BufferedWriter,
-    File,
-};
-use std::io::fs::{
-    PathExtensions,
-    walk_dir,
-};
+use std::collections::HashMap;
+use std::io::{BufferedWriter, File};
+use std::io::fs::{PathExtensions, walk_dir};
 use std::mem::swap;
 use {
     FloatImage,
@@ -69,7 +62,7 @@ impl TilesheetManager {
         let lookup = load_tiles(name);
         let entries = load_entries(&lookup);
         TilesheetManager {
-            name: name.into_string(),
+            name: name.to_owned(),
             lookup: lookup,
             entries: entries,
             tilesheets: tilesheets,
@@ -128,8 +121,8 @@ impl TilesheetManager {
             self.increment();
         }
         let pos = self.next_pos();
-        self.lookup.insert(name.into_string(), pos);
-        self.entries.insert(pos, name.into_string());
+        self.lookup.insert(name.to_owned(), pos);
+        self.entries.insert(pos, name.to_owned());
         pos
     }
 }
@@ -146,9 +139,9 @@ fn load_tiles(name: &str) -> HashMap<String, (u32, u32)> {
     };
     let data = file.read_to_string().unwrap();
     reg.captures_iter(data.as_slice()).map(|cap| {
-        let x = from_str(cap.at(1).unwrap()).unwrap();
-        let y = from_str(cap.at(2).unwrap()).unwrap();
-        let name = cap.at(3).unwrap().into_string();
+        let x = cap.at(1).unwrap().parse().unwrap();
+        let y = cap.at(2).unwrap().parse().unwrap();
+        let name = cap.at(3).unwrap().to_owned();
         (name, (x, y))
     }).collect()
 }
