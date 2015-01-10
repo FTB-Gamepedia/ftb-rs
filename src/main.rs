@@ -15,7 +15,6 @@ use std::collections::{HashMap};
 use std::fs::{File, copy, walk_dir};
 use std::io::prelude::*;
 use std::io::{BufReader, BufWriter};
-use std::num::{Float};
 use std::path::{Path};
 
 mod tilesheets;
