@@ -6,10 +6,8 @@ authors = ["Peter Atashian <retep998@gmail.com>"]
 
 [dependencies]
 regex = "*"
+regex_macros = "*"
 rustc-serialize = "*"
 
 [dependencies.image]
 git = "https://github.com/PistonDevelopers/image"
-
-[dependencies.hyper]
-git = "https://github.com/hyperium/hyper"

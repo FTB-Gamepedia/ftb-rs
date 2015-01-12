@@ -1,15 +1,13 @@
 // Copyright © 2014, Peter Atashian
 
-#![feature(phase, associated_types, slicing_syntax)]
+#![feature(slicing_syntax, plugin)]
+#![allow(unstable)]
 
-extern crate cookie;
-extern crate hyper;
 extern crate image;
-#[phase(plugin)]
+#[plugin]
 extern crate regex_macros;
 extern crate regex;
 extern crate "rustc-serialize" as serialize;
-extern crate url;
 
 use image::{GenericImage, ImageBuffer, Pixel, Rgba, RgbaImage};
 use image::ColorType::RGBA;
@@ -17,7 +15,7 @@ use std::borrow::ToOwned;
 use std::collections::HashMap;
 use std::io::File;
 use std::io::fs::PathExtensions;
-use std::num::{Float, FloatMath};
+use std::num::{Float};
 
 pub mod tilesheets;
 
@@ -56,7 +54,7 @@ impl Srgb for Rgba<u8> {
 }
 fn decode_srgb(img: &RgbaImage) -> FloatImage {
     let (w, h) = img.dimensions();
-    ImageBuffer::from_fn(w, h, |x, y| img[(x, y)].decode())
+    ImageBuffer::from_fn(w, h, Box::new(|&: x, y| img[(x, y)].decode()))
 }
 trait Linear {
     type Srgb;
@@ -83,14 +81,14 @@ impl Linear for Rgba<f32> {
 }
 fn encode_srgb(img: &FloatImage) -> RgbaImage {
     let (w, h) = img.dimensions();
-    ImageBuffer::from_fn(w, h, |x, y| img[(x, y)].encode())
+    ImageBuffer::from_fn(w, h, Box::new(|&: x, y| img[(x, y)].encode()))
 }
 fn resize(img: &FloatImage, width: u32, height: u32) -> FloatImage {
     let (w, h) = img.dimensions();
     assert!(width.cmp(&w) == height.cmp(&h));
     if width < w {
         let (rw, rh) = (w as f32 / (width as f32), h as f32 / (height as f32));
-        ImageBuffer::from_fn(width, height, |x, y| {
+        ImageBuffer::from_fn(width, height, Box::new(|&: x: u32, y: u32| {
             let (x1, x2) = ((x as f32 * rw) as u32, ((x + 1) as f32 * rw) as u32);
             let (y1, y2) = ((y as f32 * rh) as u32, ((y + 1) as f32 * rh) as u32);
             let (mut r, mut g, mut b, mut a) = (0., 0., 0., 0.);
@@ -105,16 +103,16 @@ fn resize(img: &FloatImage, width: u32, height: u32) -> FloatImage {
             }
             let m = 1. / (((x2 - x1) * (y2 - y1)) as f32);
             Rgba([r * m, g * m, b * m, a * m])
-        })
+        }))
     } else if width == w {
         img.clone()
     } else {
         let (rw, rh) = (w as f32 / (width as f32), h as f32 / (height as f32));
-        ImageBuffer::from_fn(width, height, |x, y| {
+        ImageBuffer::from_fn(width, height, Box::new(|&: x: u32, y: u32| {
             let xx = (x as f32 * rw) as u32;
             let yy = (y as f32 * rh) as u32;
             img[(xx, yy)]
-        })
+        }))
     }
 }
 
@@ -144,10 +142,10 @@ pub fn check_navbox() {
     let mut file = File::open(&path).unwrap();
     let data = file.read_to_string().unwrap();
     for cap in reg.captures_iter(data.as_slice()) {
-        let name = format!("mod=GT|{}", cap.at(3));
+        let name = format!("mod=GT|{}", cap.at(3).unwrap());
         let name = name.as_slice();
         if !navbox.contains(name) && !name.contains("(Fluid)") {
-            println!("{}", cap.at(3));
+            println!("{}", cap.at(3).unwrap());
         }
     }
 }
@@ -158,13 +156,13 @@ pub fn import_old_tilesheet(name: &str) {
     let mut file = File::open(&path).unwrap();
     let data = file.read_to_string().unwrap();
     let name = format!("work/tilesheets/Tilesheet {}.txt", name);
-    let path = Path::new(name[]);
+    let path = Path::new(&name[]);
     let mut out = File::create(&path).unwrap();
     let reg = regex!(r"Edit\s+[0-9]+\s+(.+?)\s+[A-Z0-9]+\s+([0-9]+)\s+([0-9]+)\s+16px, 32px\r?\n");
     for cap in reg.captures_iter(data.as_slice()) {
-        let name = cap.at(1);
-        let x = cap.at(2);
-        let y = cap.at(3);
+        let name = cap.at(1).unwrap();
+        let x = cap.at(2).unwrap();
+        let y = cap.at(3).unwrap();
         (writeln!(&mut out, "{} {} {}", x, y, name)).unwrap();
     }
 }
@@ -172,27 +170,27 @@ pub fn fix_lang() {
     let path = Path::new(r"work/GregTech.lang");
     let mut file = File::open(&path).unwrap();
     let data = file.read_to_string().unwrap();
-    let data = regex!("\r").replace_all(data[], "");
-    let data = regex!("(blockores\\.[0-9]{1,3}\\.name=.*)").replace_all(data[], "$1 (Stone)");
-    let data = regex!("(blockores\\.1[0-9]{3}\\.name=.*)").replace_all(data[], "$1 (Netherrack)");
-    let data = regex!("(blockores\\.2[0-9]{3}\\.name=.*)").replace_all(data[], "$1 (Endstone)");
-    let data = regex!("(blockores\\.3[0-9]{3}\\.name=.*)").replace_all(data[], "$1 (Black Granite)");
-    let data = regex!("(blockores\\.4[0-9]{3}\\.name=.*)").replace_all(data[], "$1 (Red Granite)");
-    let data = regex!("(blockores\\.16[0-9]{3}\\.name=.*)").replace_all(data[], "$1 (Stone)");
-    let data = regex!("(blockores\\.17[0-9]{3}\\.name=.*)").replace_all(data[], "$1 (Netherrack)");
-    let data = regex!("(blockores\\.18[0-9]{3}\\.name=.*)").replace_all(data[], "$1 (Endstone)");
-    let data = regex!("(blockores\\.19[0-9]{3}\\.name=.*)").replace_all(data[], "$1 (Black Granite)");
-    let data = regex!("(blockores\\.20[0-9]{3}\\.name=.*)").replace_all(data[], "$1 (Red Granite)");
+    let data = regex!("\r").replace_all(&data[], "");
+    let data = regex!("(blockores\\.[0-9]{1,3}\\.name=.*)").replace_all(&data[], "$1 (Stone)");
+    let data = regex!("(blockores\\.1[0-9]{3}\\.name=.*)").replace_all(&data[], "$1 (Netherrack)");
+    let data = regex!("(blockores\\.2[0-9]{3}\\.name=.*)").replace_all(&data[], "$1 (Endstone)");
+    let data = regex!("(blockores\\.3[0-9]{3}\\.name=.*)").replace_all(&data[], "$1 (Black Granite)");
+    let data = regex!("(blockores\\.4[0-9]{3}\\.name=.*)").replace_all(&data[], "$1 (Red Granite)");
+    let data = regex!("(blockores\\.16[0-9]{3}\\.name=.*)").replace_all(&data[], "$1 (Stone)");
+    let data = regex!("(blockores\\.17[0-9]{3}\\.name=.*)").replace_all(&data[], "$1 (Netherrack)");
+    let data = regex!("(blockores\\.18[0-9]{3}\\.name=.*)").replace_all(&data[], "$1 (Endstone)");
+    let data = regex!("(blockores\\.19[0-9]{3}\\.name=.*)").replace_all(&data[], "$1 (Black Granite)");
+    let data = regex!("(blockores\\.20[0-9]{3}\\.name=.*)").replace_all(&data[], "$1 (Red Granite)");
     let path = Path::new(r"work/modified.lang");
     let mut file = File::create(&path).unwrap();
-    file.write_str(data[]).unwrap();
+    file.write_str(&data[]).unwrap();
 }
 
 fn main() {
     let args = std::os::args();
-    let args = args.iter().map(|x| x[]).collect::<Vec<_>>();
-    match args[] {
-        [_, "update", name] => tilesheets::update_tilesheet(name[], &[16, 32]),
+    let args = args.iter().map(|x| &x[]).collect::<Vec<_>>();
+    match &args[] {
+        [_, "update", name] => tilesheets::update_tilesheet(name, &[16, 32]),
         _ => println!("Invalid arguments"),
     }
 }

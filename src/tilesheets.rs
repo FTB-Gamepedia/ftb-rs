@@ -5,13 +5,14 @@ use image::{
     ImageBuffer,
     Pixel,
     RgbaImage,
-    mod,
+    self,
 };
 use std::borrow::ToOwned;
 use std::cmp::max;
 use std::collections::HashMap;
 use std::io::{BufferedWriter, File};
 use std::io::fs::{PathExtensions, walk_dir};
+use std::io::process::Command;
 use std::mem::swap;
 use {
     FloatImage,
@@ -88,12 +89,13 @@ impl TilesheetManager {
             let name = format!("Tilesheet {} {}.png", self.name, tilesheet.size);
             let path = Path::new(r"work\tilesheets").join(name.as_slice());
             save(&tilesheet.img, &path);
+            Command::new("optipng").arg(path).spawn().unwrap().forget();
         }
         let name = format!("Tilesheet {}.txt", self.name);
         let path = Path::new(r"work\tilesheets").join(name.as_slice());
         let mut file = BufferedWriter::new(File::create(&path).unwrap());
         let mut stuff = self.entries.iter().map(|(&(x, y), tile)| (x, y, tile)).collect::<Vec<_>>();
-        stuff.sort_by(|a, b| if a.1.cmp(&b.1) == Equal { a.0.cmp(&b.0) } else { a.1.cmp(&b.1) });
+        stuff.sort_by(|a, b| if a.1 == b.1 { a.0.cmp(&b.0) } else { a.1.cmp(&b.1) });
         for &(x, y, tile) in stuff.iter() {
             (writeln!(&mut file, "{} {} {}", x, y, tile)).unwrap();
         }
