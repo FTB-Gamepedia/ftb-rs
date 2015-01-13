@@ -4,6 +4,7 @@
 #![allow(unstable)]
 
 extern crate image;
+extern crate lodepng;
 #[plugin]
 extern crate regex_macros;
 extern crate regex;

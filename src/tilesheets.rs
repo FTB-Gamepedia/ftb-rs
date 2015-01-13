@@ -1,12 +1,7 @@
 // Copyright © 2014, Peter Atashian
 
-use image::{
-    GenericImage,
-    ImageBuffer,
-    Pixel,
-    RgbaImage,
-    self,
-};
+use image::{self, GenericImage, ImageBuffer, Pixel, RgbaImage};
+use lodepng::load;
 use std::borrow::ToOwned;
 use std::cmp::max;
 use std::collections::HashMap;
@@ -14,13 +9,7 @@ use std::io::{BufferedWriter, File};
 use std::io::fs::{PathExtensions, walk_dir};
 use std::io::process::Command;
 use std::mem::swap;
-use {
-    FloatImage,
-    decode_srgb,
-    encode_srgb,
-    resize,
-    save,
-};
+use {FloatImage, decode_srgb, encode_srgb, resize, save};
 
 struct Tilesheet {
     size: u32,
@@ -76,7 +65,7 @@ impl TilesheetManager {
             if !path.is_file() { continue }
             if path.extension_str() != Some("png") { continue }
             let name = path.filestem_str().unwrap();
-            let img = image::open(&path).unwrap().to_rgba();
+            let img = load(&path).unwrap();
             let img = decode_srgb(&img);
             let (x, y) = self.lookup(name);
             for tilesheet in self.tilesheets.iter_mut() {

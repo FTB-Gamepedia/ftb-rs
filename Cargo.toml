@@ -8,6 +8,7 @@ authors = ["Peter Atashian <retep998@gmail.com>"]
 regex = "*"
 regex_macros = "*"
 rustc-serialize = "*"
+image = "*"
 
-[dependencies.image]
-git = "https://github.com/PistonDevelopers/image"
+[dependencies.lodepng]
+git = "https://github.com/retep998/lodepng-rs"
