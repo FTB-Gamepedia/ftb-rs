@@ -192,6 +192,7 @@ fn main() {
     let args = args.iter().map(|x| &x[]).collect::<Vec<_>>();
     match &args[] {
         [_, "update", name] => tilesheets::update_tilesheet(name, &[16, 32]),
+        [_, "import", name] => import_old_tilesheet(name),
         _ => println!("Invalid arguments"),
     }
 }
