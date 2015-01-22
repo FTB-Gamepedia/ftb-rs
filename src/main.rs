@@ -14,7 +14,7 @@ use image::{GenericImage, ImageBuffer, Pixel, Rgba, RgbaImage};
 use image::ColorType::RGBA;
 use std::borrow::ToOwned;
 use std::collections::HashMap;
-use std::io::File;
+use std::io::{BufferedReader, BufferedWriter, File};
 use std::io::fs::PathExtensions;
 use std::num::{Float};
 
@@ -117,11 +117,13 @@ fn resize(img: &FloatImage, width: u32, height: u32) -> FloatImage {
     }
 }
 
-pub fn check_lang_dups(lang: &HashMap<String, String>) {
+pub fn check_lang_dups() {
+    let lang = read_gt_lang();
     let mut stuff = HashMap::new();
     for (key, val) in lang.iter() {
+        if !key.as_slice().contains(".name") { continue }
         if key.as_slice().contains(".tooltip") { continue }
-        if key.as_slice().contains("fluid.") { continue }
+        if key.as_slice().contains("gt.recipe") { continue }
         if key.as_slice().contains("DESCRIPTION") { continue }
         match stuff.get(val) {
             Some(other) => {
@@ -167,7 +169,7 @@ pub fn import_old_tilesheet(name: &str) {
         (writeln!(&mut out, "{} {} {}", x, y, name)).unwrap();
     }
 }
-pub fn fix_lang() {
+fn fix_lang() {
     let path = Path::new(r"work/GregTech.lang");
     let mut file = File::open(&path).unwrap();
     let data = file.read_to_string().unwrap();
@@ -182,9 +184,42 @@ pub fn fix_lang() {
     let data = regex!("(blockores\\.18[0-9]{3}\\.name=.*)").replace_all(&data[], "$1 (Endstone)");
     let data = regex!("(blockores\\.19[0-9]{3}\\.name=.*)").replace_all(&data[], "$1 (Black Granite)");
     let data = regex!("(blockores\\.20[0-9]{3}\\.name=.*)").replace_all(&data[], "$1 (Red Granite)");
-    let path = Path::new(r"work/modified.lang");
+    let data = regex!("(S:fluid\\..*=.*)").replace_all(&data[], "$1 (Fluid)");
+    drop(file);
     let mut file = File::create(&path).unwrap();
     file.write_str(&data[]).unwrap();
+}
+
+fn dump_oredict() {
+    let lang = read_gt_lang();
+    let reg = regex!("^([0-9]+)x(.+)@([0-9]+)$");
+    let fin = File::open(&Path::new(r"work/neiintegration_oredict.csv")).unwrap();
+    let fout = File::create(&Path::new(r"work/oredict.txt")).unwrap();
+    let mut fin = BufferedReader::new(fin);
+    let mut fout = BufferedWriter::new(fout);
+    for line in fin.lines() {
+        let line = line.unwrap();
+        let parts = line.trim().split(',').collect::<Vec<_>>();
+        assert!(parts.len() == 5);
+        let tag = parts[0];
+        let stack = parts[1];
+        let _id = parts[2];
+        let wildcard = parts[3];
+        let modname = parts[4];
+        if modname != "gregtech" { continue }
+        assert!(wildcard == "false");
+        let cap = reg.captures(stack).unwrap();
+        let quantity = cap.at(1).unwrap();
+        assert!(quantity == "1");
+        let item = cap.at(2).unwrap();
+        let meta = cap.at(3).unwrap();
+        let unlocal = format!("{}.{}.name", item, meta);
+        if !lang.contains_key(&unlocal) {
+            println!("Missing: {}", unlocal);
+            continue
+        }
+        writeln!(&mut fout, "{}!{}!GT!!", tag, lang[unlocal]).unwrap();
+    }
 }
 
 fn main() {
@@ -193,6 +228,9 @@ fn main() {
     match &args[] {
         [_, "update", name] => tilesheets::update_tilesheet(name, &[16, 32]),
         [_, "import", name] => import_old_tilesheet(name),
+        [_, "fixlang"] => fix_lang(),
+        [_, "langdup"] => check_lang_dups(),
+        [_, "dumporedict"] => dump_oredict(),
         _ => println!("Invalid arguments"),
     }
 }

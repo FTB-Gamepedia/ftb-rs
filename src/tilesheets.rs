@@ -74,12 +74,12 @@ impl TilesheetManager {
         }
     }
     fn save(&self) {
-        for tilesheet in self.tilesheets.iter() {
+        let _optipng = self.tilesheets.iter().map(|tilesheet| {
             let name = format!("Tilesheet {} {}.png", self.name, tilesheet.size);
             let path = Path::new(r"work\tilesheets").join(name.as_slice());
             save(&tilesheet.img, &path);
-            Command::new("optipng").arg(path).spawn().unwrap().forget();
-        }
+            Command::new("optipng").arg(path).spawn().unwrap()
+        }).collect::<Vec<_>>();
         let name = format!("Tilesheet {}.txt", self.name);
         let path = Path::new(r"work\tilesheets").join(name.as_slice());
         let mut file = BufferedWriter::new(File::create(&path).unwrap());
@@ -88,6 +88,7 @@ impl TilesheetManager {
         for &(x, y, tile) in stuff.iter() {
             (writeln!(&mut file, "{} {} {}", x, y, tile)).unwrap();
         }
+        println!("Waiting for optipng to finish");
     }
     fn increment(&mut self) {
         self.next.1 += 1;
