@@ -5,9 +5,9 @@ use lodepng::load;
 use std::borrow::ToOwned;
 use std::cmp::max;
 use std::collections::HashMap;
-use std::io::{BufferedWriter, File};
-use std::io::fs::{PathExtensions, walk_dir};
-use std::io::process::Command;
+use std::old_io::{BufferedWriter, File};
+use std::old_io::fs::{PathExtensions, walk_dir};
+use std::old_io::process::Command;
 use std::mem::swap;
 use {FloatImage, decode_srgb, encode_srgb, resize, save};
 

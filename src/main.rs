@@ -1,7 +1,6 @@
 // Copyright © 2014, Peter Atashian
 
-#![feature(slicing_syntax, plugin)]
-#![allow(unstable)]
+#![feature(core, io, os, path, plugin, slicing_syntax)]
 
 extern crate image;
 extern crate lodepng;
@@ -14,18 +13,20 @@ use image::{GenericImage, ImageBuffer, Pixel, Rgba, RgbaImage};
 use image::ColorType::RGBA;
 use std::borrow::ToOwned;
 use std::collections::HashMap;
-use std::io::{BufferedReader, BufferedWriter, File};
-use std::io::fs::PathExtensions;
+use std::old_io::{BufferedReader, BufferedWriter, File};
+use std::old_io::fs::PathExtensions;
 use std::num::{Float};
 
-pub mod tilesheets;
+mod tilesheets;
+#[allow(unused_variables, non_snake_case)]
+mod oregen;
 
-type FloatImage = ImageBuffer<Vec<f32>, f32, Rgba<f32>>;
-pub fn save(img: &RgbaImage, path: &Path) {
+type FloatImage = ImageBuffer<Rgba<f32>, Vec<f32>>;
+fn save(img: &RgbaImage, path: &Path) {
     image::save_buffer(path, img.as_slice(), img.width(), img.height(), RGBA(8)).unwrap();
 }
 
-pub fn read_gt_lang() -> HashMap<String, String> {
+fn read_gt_lang() -> HashMap<String, String> {
     let path = Path::new(r"work/GregTech.lang");
     let mut file = File::open(&path).unwrap();
     let data = file.read_to_string().unwrap();
@@ -117,7 +118,7 @@ fn resize(img: &FloatImage, width: u32, height: u32) -> FloatImage {
     }
 }
 
-pub fn check_lang_dups() {
+fn check_lang_dups() {
     let lang = read_gt_lang();
     let mut stuff = HashMap::new();
     for (key, val) in lang.iter() {
@@ -135,7 +136,7 @@ pub fn check_lang_dups() {
         stuff.insert(val.clone(), key);
     }
 }
-pub fn check_navbox() {
+fn check_navbox() {
     let reg = regex!(r"(\d+) (\d+) (.+?)\r?\n");
     let path = Path::new(r"work\navbox.txt");
     let mut file = File::open(&path).unwrap();
@@ -152,7 +153,7 @@ pub fn check_navbox() {
         }
     }
 }
-pub fn import_old_tilesheet(name: &str) {
+fn import_old_tilesheet(name: &str) {
     let path = Path::new(r"work/tilesheets/import.txt");
     if !path.is_file() { return }
     println!("Importing old tilesheet");
@@ -225,12 +226,13 @@ fn dump_oredict() {
 fn main() {
     let args = std::os::args();
     let args = args.iter().map(|x| &x[]).collect::<Vec<_>>();
-    match &args[] {
-        [_, "update", name] => tilesheets::update_tilesheet(name, &[16, 32]),
-        [_, "import", name] => import_old_tilesheet(name),
-        [_, "fixlang"] => fix_lang(),
-        [_, "langdup"] => check_lang_dups(),
-        [_, "dumporedict"] => dump_oredict(),
+    match &args[1..] {
+        ["update", name] => tilesheets::update_tilesheet(name, &[16, 32]),
+        ["import", name] => import_old_tilesheet(name),
+        ["fixlang"] => fix_lang(),
+        ["langdup"] => check_lang_dups(),
+        ["dumporedict"] => dump_oredict(),
+        ["oregen"] => oregen::oregen(),
         _ => println!("Invalid arguments"),
     }
 }
