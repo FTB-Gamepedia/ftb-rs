@@ -1,11 +1,10 @@
 // Copyright © 2014, Peter Atashian
 
 #![feature(core, io, os, path, plugin, slicing_syntax)]
+#![plugin(regex_macros)]
 
 extern crate image;
 extern crate lodepng;
-#[plugin]
-extern crate regex_macros;
 extern crate regex;
 extern crate "rustc-serialize" as serialize;
 
