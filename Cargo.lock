@@ -2,7 +2,7 @@
 name = "ftb"
 version = "0.0.1"
 dependencies = [
- "image 0.2.0-alpha.9 (git+https://github.com/PistonDevelopers/image)",
+ "image 0.2.0-alpha.10 (git+https://github.com/PistonDevelopers/image)",
  "lodepng 0.0.1 (git+https://github.com/retep998/lodepng-rs)",
  "regex 0.1.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "regex_macros 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -11,13 +11,13 @@ dependencies = [
 
 [[package]]
 name = "gcc"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "image"
-version = "0.2.0-alpha.9"
-source = "git+https://github.com/PistonDevelopers/image#0bf737e5b4857c5bc11ed737b60f3322e816f518"
+version = "0.2.0-alpha.10"
+source = "git+https://github.com/PistonDevelopers/image#ffbd2d5e16e6221d17f87e84c3f9d1b2cdf760d7"
 dependencies = [
  "num 0.1.12 (git+https://github.com/rust-lang/num)",
 ]
@@ -30,10 +30,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "lodepng"
 version = "0.0.1"
-source = "git+https://github.com/retep998/lodepng-rs#14c0288df2cfb486d06f4b11d84963fb65e12199"
+source = "git+https://github.com/retep998/lodepng-rs#8a8121e40ada9a7c7cd8b5deeddd67c34f3e6bc1"
 dependencies = [
- "gcc 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "image 0.2.0-alpha.9 (git+https://github.com/PistonDevelopers/image)",
+ "gcc 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "image 0.2.0-alpha.10 (git+https://github.com/PistonDevelopers/image)",
 ]
 
 [[package]]

@@ -134,6 +134,7 @@ fn load_tiles(name: &str) -> HashMap<String, (u32, u32)> {
         let x = cap.at(1).unwrap().parse().unwrap();
         let y = cap.at(2).unwrap().parse().unwrap();
         let name = cap.at(3).unwrap().to_owned();
+        if name.contains("_") { panic!("Illegal name: {:?}", name) }
         (name, (x, y))
     }).collect()
 }
