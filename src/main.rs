@@ -1,6 +1,6 @@
 // Copyright © 2014, Peter Atashian
 
-#![feature(core, io, os, path, plugin, slicing_syntax)]
+#![feature(core, io, os, path, plugin, slicing_syntax, std_misc)]
 #![plugin(regex_macros)]
 
 extern crate image;
@@ -13,7 +13,7 @@ use image::ColorType::RGBA;
 use std::borrow::ToOwned;
 use std::collections::HashMap;
 use std::old_io::{BufferedReader, BufferedWriter, File};
-use std::old_io::fs::PathExtensions;
+use std::old_io::fs::{PathExtensions, copy, walk_dir};
 use std::num::{Float};
 
 mod tilesheets;
@@ -116,7 +116,20 @@ fn resize(img: &FloatImage, width: u32, height: u32) -> FloatImage {
         }))
     }
 }
-
+fn grab_crops() {
+    let path = Path::new(r"C:\Users\Peter\Minecraft\Wiki\GT Dev\assets\ic2\textures\blocks\crop");
+    let out = Path::new(r"work\tilesheets\Crops");
+    let reg = regex!(r"blockCrop\.(.*)\.(.*)");
+    for path in walk_dir(&path).unwrap() {
+        if !path.is_file() { continue }
+        if path.extension_str() != Some("png") { continue }
+        let name = path.filestem_str().unwrap();
+        let cap = reg.captures(name).unwrap();
+        let new = format!("Crop {} ({}).png", cap.at(1).unwrap(), cap.at(2).unwrap());
+        let newp = out.join(new);
+        copy(&path, &newp).unwrap();
+    }
+}
 fn check_lang_dups() {
     let lang = read_gt_lang();
     let mut stuff = HashMap::new();
@@ -133,23 +146,6 @@ fn check_lang_dups() {
             None => (),
         }
         stuff.insert(val.clone(), key);
-    }
-}
-fn check_navbox() {
-    let reg = regex!(r"(\d+) (\d+) (.+?)\r?\n");
-    let path = Path::new(r"work\navbox.txt");
-    let mut file = File::open(&path).unwrap();
-    let navbox = file.read_to_string().unwrap();
-    let navbox = navbox.as_slice();
-    let path = Path::new(r"work\tilesheets\Tilesheet GT.txt");
-    let mut file = File::open(&path).unwrap();
-    let data = file.read_to_string().unwrap();
-    for cap in reg.captures_iter(data.as_slice()) {
-        let name = format!("mod=GT|{}", cap.at(3).unwrap());
-        let name = name.as_slice();
-        if !navbox.contains(name) && !name.contains("(Fluid)") {
-            println!("{}", cap.at(3).unwrap());
-        }
     }
 }
 fn import_old_tilesheet(name: &str) {
@@ -226,12 +222,14 @@ fn main() {
     let args = std::os::args();
     let args = args.iter().map(|x| &x[]).collect::<Vec<_>>();
     match &args[1..] {
-        ["update", name] => tilesheets::update_tilesheet(name, &[16, 32]),
+        ["update", name] => tilesheets::update_tilesheet(name, &[16, 32], false),
+        ["overwrite", name] => tilesheets::update_tilesheet(name, &[16, 32], true),
         ["import", name] => import_old_tilesheet(name),
         ["fixlang"] => fix_lang(),
         ["langdup"] => check_lang_dups(),
         ["dumporedict"] => dump_oredict(),
         ["oregen"] => oregen::oregen(),
+        ["crops"] => grab_crops(),
         _ => println!("Invalid arguments"),
     }
 }

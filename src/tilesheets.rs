@@ -1,14 +1,14 @@
 // Copyright © 2014, Peter Atashian
 
 use image::{self, GenericImage, ImageBuffer, Pixel, RgbaImage};
-use lodepng::load;
-use std::borrow::ToOwned;
-use std::cmp::max;
-use std::collections::HashMap;
+use lodepng::{load};
+use std::borrow::{ToOwned};
+use std::cmp::{max};
+use std::collections::{HashMap, HashSet};
 use std::old_io::{BufferedWriter, File};
 use std::old_io::fs::{PathExtensions, walk_dir};
-use std::old_io::process::Command;
-use std::mem::swap;
+use std::old_io::process::{Command};
+use std::mem::{swap};
 use {FloatImage, decode_srgb, encode_srgb, resize, save};
 
 struct Tilesheet {
@@ -61,17 +61,42 @@ impl TilesheetManager {
     }
     fn update(&mut self) {
         let path = Path::new(r"work\tilesheets").join(self.name.as_slice());
+        let mut file = File::create(&Path::new(r"work\tilesheets\Added.txt"));
         for path in walk_dir(&path).unwrap() {
             if !path.is_file() { continue }
             if path.extension_str() != Some("png") { continue }
             let name = path.filestem_str().unwrap();
+            if name.contains("_") { panic!("Illegal name: {:?}", name) }
             let img = load(&path).unwrap();
             let img = decode_srgb(&img);
-            let (x, y) = self.lookup(name);
+            let (x, y, new) = self.lookup(name);
+            if new {
+                writeln!(&mut file, "{} {} {}", x, y, name).unwrap();
+            }
             for tilesheet in self.tilesheets.iter_mut() {
                 tilesheet.insert(x, y, &img);
             }
         }
+    }
+    fn clear_unused(&mut self) {
+        let path = Path::new(r"work\tilesheets").join(self.name.as_slice());
+        let names: HashSet<_> = walk_dir(&path).unwrap().filter_map(|path| {
+            if !path.is_file() { None }
+            else if path.extension_str() != Some("png") { None }
+            else { Some(path.filestem_str().unwrap().to_owned()) }
+        }).collect();
+        let mut file = File::create(&Path::new(r"work\tilesheets\Deleted.txt"));
+        let lookup = self.lookup.drain().filter(|&(ref name, _)| {
+            if !names.contains(name) {
+                file.write_line(name).unwrap();
+                false
+            } else { true }
+        }).collect();
+        let entries = self.entries.drain().filter(|&(_, ref name)| {
+            names.contains(name)
+        }).collect();
+        self.lookup = lookup;
+        self.entries = entries;
     }
     fn save(&self) {
         let _optipng = self.tilesheets.iter().map(|tilesheet| {
@@ -104,9 +129,9 @@ impl TilesheetManager {
             (self.next.0, self.next.1 - self.next.0)
         }
     }
-    fn lookup(&mut self, name: &str) -> (u32, u32) {
+    fn lookup(&mut self, name: &str) -> (u32, u32, bool) {
         match self.lookup.get(name) {
-            Some(&x) => return x,
+            Some(&(x, y)) => return (x, y, false),
             None => (),
         }
         while self.entries.get(&self.next_pos()).is_some() {
@@ -115,7 +140,7 @@ impl TilesheetManager {
         let pos = self.next_pos();
         self.lookup.insert(name.to_owned(), pos);
         self.entries.insert(pos, name.to_owned());
-        pos
+        (pos.0, pos.1, true)
     }
 }
 fn load_tiles(name: &str) -> HashMap<String, (u32, u32)> {
@@ -134,7 +159,6 @@ fn load_tiles(name: &str) -> HashMap<String, (u32, u32)> {
         let x = cap.at(1).unwrap().parse().unwrap();
         let y = cap.at(2).unwrap().parse().unwrap();
         let name = cap.at(3).unwrap().to_owned();
-        if name.contains("_") { panic!("Illegal name: {:?}", name) }
         (name, (x, y))
     }).collect()
 }
@@ -153,10 +177,13 @@ fn load_tilesheet(name: &str, size: u32) -> Tilesheet {
 fn load_tilesheets(name: &str, sizes: &[u32]) -> Vec<Tilesheet> {
     sizes.iter().map(|&size| load_tilesheet(name, size)).collect()
 }
-pub fn update_tilesheet(name: &str, sizes: &[u32]) {
+pub fn update_tilesheet(name: &str, sizes: &[u32], overwrite: bool) {
     println!("Loading tilesheet");
     let mut manager = TilesheetManager::new(name, sizes);
     println!("Updating tilesheet");
+    if overwrite {
+        manager.clear_unused();
+    }
     manager.update();
     println!("Saving tilesheet");
     manager.save();
