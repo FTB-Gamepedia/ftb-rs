@@ -1,6 +1,6 @@
 // Copyright © 2014, Peter Atashian
 
-#![feature(core, io, os, path, plugin, slicing_syntax, std_misc)]
+#![feature(core, env, io, path, plugin, std_misc)]
 #![plugin(regex_macros)]
 
 extern crate image;
@@ -55,7 +55,7 @@ impl Srgb for Rgba<u8> {
 }
 fn decode_srgb(img: &RgbaImage) -> FloatImage {
     let (w, h) = img.dimensions();
-    ImageBuffer::from_fn(w, h, Box::new(|&: x, y| img[(x, y)].decode()))
+    ImageBuffer::from_fn(w, h, |x, y| img[(x, y)].decode())
 }
 trait Linear {
     type Srgb;
@@ -82,14 +82,14 @@ impl Linear for Rgba<f32> {
 }
 fn encode_srgb(img: &FloatImage) -> RgbaImage {
     let (w, h) = img.dimensions();
-    ImageBuffer::from_fn(w, h, Box::new(|&: x, y| img[(x, y)].encode()))
+    ImageBuffer::from_fn(w, h, |x, y| img[(x, y)].encode())
 }
 fn resize(img: &FloatImage, width: u32, height: u32) -> FloatImage {
     let (w, h) = img.dimensions();
     assert!(width.cmp(&w) == height.cmp(&h));
     if width < w {
         let (rw, rh) = (w as f32 / (width as f32), h as f32 / (height as f32));
-        ImageBuffer::from_fn(width, height, Box::new(|&: x: u32, y: u32| {
+        ImageBuffer::from_fn(width, height, |x: u32, y: u32| {
             let (x1, x2) = ((x as f32 * rw) as u32, ((x + 1) as f32 * rw) as u32);
             let (y1, y2) = ((y as f32 * rh) as u32, ((y + 1) as f32 * rh) as u32);
             let (mut r, mut g, mut b, mut a) = (0., 0., 0., 0.);
@@ -104,16 +104,16 @@ fn resize(img: &FloatImage, width: u32, height: u32) -> FloatImage {
             }
             let m = 1. / (((x2 - x1) * (y2 - y1)) as f32);
             Rgba([r * m, g * m, b * m, a * m])
-        }))
+        })
     } else if width == w {
         img.clone()
     } else {
         let (rw, rh) = (w as f32 / (width as f32), h as f32 / (height as f32));
-        ImageBuffer::from_fn(width, height, Box::new(|&: x: u32, y: u32| {
+        ImageBuffer::from_fn(width, height, |x: u32, y: u32| {
             let xx = (x as f32 * rw) as u32;
             let yy = (y as f32 * rh) as u32;
             img[(xx, yy)]
-        }))
+        })
     }
 }
 fn grab_crops() {
@@ -219,8 +219,8 @@ fn dump_oredict() {
 }
 
 fn main() {
-    let args = std::os::args();
-    let args = args.iter().map(|x| &x[]).collect::<Vec<_>>();
+    let args: Vec<_> = std::env::args().collect();
+    let args: Vec<_> = args.iter().map(|x| &**x).collect();
     match &args[1..] {
         ["update", name] => tilesheets::update_tilesheet(name, &[16, 32], false),
         ["overwrite", name] => tilesheets::update_tilesheet(name, &[16, 32], true),

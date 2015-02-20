@@ -62,10 +62,21 @@ impl TilesheetManager {
     fn update(&mut self) {
         let path = Path::new(r"work\tilesheets").join(self.name.as_slice());
         let mut file = File::create(&Path::new(r"work\tilesheets\Added.txt"));
+        let renames = if let Ok(mut file) = File::open(&path.join("renames.txt")) {
+            let reg = regex!("(.*)=(.*)");
+            let s = file.read_to_string().unwrap();
+            s.lines_any().map(|line| {
+                let cap = reg.captures(line).unwrap();
+                (cap.at(1).unwrap().to_owned(), cap.at(2).unwrap().to_owned())
+            }).collect()
+        } else {
+            HashMap::new()
+        };
         for path in walk_dir(&path).unwrap() {
             if !path.is_file() { continue }
             if path.extension_str() != Some("png") { continue }
             let name = path.filestem_str().unwrap();
+            let name = if let Some(r) = renames.get(name) { &**r } else { name };
             if name.contains("_") { panic!("Illegal name: {:?}", name) }
             let img = load(&path).unwrap();
             let img = decode_srgb(&img);
