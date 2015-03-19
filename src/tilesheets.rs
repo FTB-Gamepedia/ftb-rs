@@ -5,10 +5,12 @@ use lodepng::{load};
 use std::borrow::{ToOwned};
 use std::cmp::{max};
 use std::collections::{HashMap, HashSet};
-use std::old_io::{BufferedWriter, File};
-use std::old_io::fs::{PathExtensions, walk_dir};
-use std::old_io::process::{Command};
+use std::fs::{File, walk_dir};
+use std::io::prelude::*;
+use std::io::{BufWriter};
+use std::process::{Command};
 use std::mem::{swap};
+use std::path::{Path};
 use {FloatImage, decode_srgb, encode_srgb, resize, save};
 
 struct Tilesheet {
@@ -61,10 +63,11 @@ impl TilesheetManager {
     }
     fn update(&mut self) {
         let path = Path::new(r"work\tilesheets").join(self.name.as_slice());
-        let mut file = File::create(&Path::new(r"work\tilesheets\Added.txt"));
+        let mut file = File::create(&Path::new(r"work\tilesheets\Added.txt")).unwrap();
         let renames = if let Ok(mut file) = File::open(&path.join("renames.txt")) {
             let reg = regex!("(.*)=(.*)");
-            let s = file.read_to_string().unwrap();
+            let mut s = String::new();
+            file.read_to_string(&mut s).unwrap();
             s.lines_any().map(|line| {
                 let cap = reg.captures(line).unwrap();
                 (cap.at(1).unwrap().to_owned(), cap.at(2).unwrap().to_owned())
@@ -72,10 +75,11 @@ impl TilesheetManager {
         } else {
             HashMap::new()
         };
-        for path in walk_dir(&path).unwrap() {
+        for entry in walk_dir(&path).unwrap() {
+            let path = entry.unwrap().path();
             if !path.is_file() { continue }
-            if path.extension_str() != Some("png") { continue }
-            let name = path.filestem_str().unwrap();
+            if path.extension().and_then(|x| x.to_str()) != Some("png") { continue }
+            let name = path.file_stem().unwrap().to_str().unwrap();
             let name = if let Some(r) = renames.get(name) { &**r } else { name };
             if name.contains("_") { panic!("Illegal name: {:?}", name) }
             let img = load(&path).unwrap();
@@ -91,15 +95,19 @@ impl TilesheetManager {
     }
     fn clear_unused(&mut self) {
         let path = Path::new(r"work\tilesheets").join(self.name.as_slice());
-        let names: HashSet<_> = walk_dir(&path).unwrap().filter_map(|path| {
+        let names: HashSet<_> = walk_dir(&path).unwrap().filter_map(|entry| {
+            let path = match entry {
+                Ok(x) => x.path(),
+                Err(_) => return None,
+            };
             if !path.is_file() { None }
-            else if path.extension_str() != Some("png") { None }
-            else { Some(path.filestem_str().unwrap().to_owned()) }
+            else if path.extension().and_then(|x| x.to_str()) != Some("png") { None }
+            else { Some(path.file_stem().unwrap().to_str().unwrap().to_owned()) }
         }).collect();
-        let mut file = File::create(&Path::new(r"work\tilesheets\Deleted.txt"));
+        let mut file = File::create(&Path::new(r"work\tilesheets\Deleted.txt")).unwrap();
         let lookup = self.lookup.drain().filter(|&(ref name, _)| {
             if !names.contains(name) {
-                file.write_line(name).unwrap();
+                writeln!(&mut file, "{}", name).unwrap();
                 false
             } else { true }
         }).collect();
@@ -118,7 +126,7 @@ impl TilesheetManager {
         }).collect::<Vec<_>>();
         let name = format!("Tilesheet {}.txt", self.name);
         let path = Path::new(r"work\tilesheets").join(name.as_slice());
-        let mut file = BufferedWriter::new(File::create(&path).unwrap());
+        let mut file = BufWriter::new(File::create(&path).unwrap());
         let mut stuff = self.entries.iter().map(|(&(x, y), tile)| (x, y, tile)).collect::<Vec<_>>();
         stuff.sort_by(|a, b| if a.1 == b.1 { a.0.cmp(&b.0) } else { a.1.cmp(&b.1) });
         for &(x, y, tile) in stuff.iter() {
@@ -165,7 +173,8 @@ fn load_tiles(name: &str) -> HashMap<String, (u32, u32)> {
             return HashMap::new();
         }
     };
-    let data = file.read_to_string().unwrap();
+    let mut data = String::new();
+    file.read_to_string(&mut data).unwrap();
     reg.captures_iter(data.as_slice()).map(|cap| {
         let x = cap.at(1).unwrap().parse().unwrap();
         let y = cap.at(2).unwrap().parse().unwrap();

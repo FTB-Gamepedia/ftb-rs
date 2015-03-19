@@ -613,7 +613,7 @@ pub fn oregen() {
     GT_Worldgen_GT_Ore_Layer("ore.mix.lapis", true, 20, 50, 40, 5, 16, !tPFAA, false, true, Lazurite, Sodalite, Lapis, Calcite);
     GT_Worldgen_GT_Ore_Layer("ore.mix.beryllium", true, 5, 30, 30, 3, 16, !tPFAA, false, true, Beryllium, Beryllium, Emerald, Thorium);
 }
-pub fn GT_Worldgen_GT_Ore_SmallPieces(name: &str, default: bool, miny: i32, maxy: i32, amount: i32, overworld: bool, nether: bool, end: bool, material: Material) {
+fn GT_Worldgen_GT_Ore_SmallPieces(name: &str, default: bool, miny: i32, maxy: i32, amount: i32, overworld: bool, nether: bool, end: bool, material: Material) {
     if !end { return }
     let mid = maxy + miny;
     let range = (maxy - miny) * 2;
@@ -624,10 +624,10 @@ pub fn GT_Worldgen_GT_Ore_SmallPieces(name: &str, default: bool, miny: i32, maxy
     <Setting name='Height' avg='{}' range='{}' scaleTo='sealevel' />
 </StandardGen>"#, name, meta, material.id, material.name, amount * 4, mid, range);
 }
-pub fn GT_Worldgen_GT_Ore_Layer(name: &str, default: bool, miny: i32, maxy: i32, weight: i32, density: i32, size: i32, overworld: bool, nether: bool, end: bool, primary: Material, secondary: Material, between: Material, sporadic: Material) {
+fn GT_Worldgen_GT_Ore_Layer(name: &str, default: bool, miny: i32, maxy: i32, weight: i32, density: i32, size: i32, overworld: bool, nether: bool, end: bool, primary: Material, secondary: Material, between: Material, sporadic: Material) {
     ()
 }
-#[derive(Copy)]
+#[derive(Clone, Copy)]
 #[allow(dead_code)]
 struct Material {
     id: i32, toolspeed: f32, tooldurability: i32, toolquality: i32, types: i32, r: i32, g: i32,

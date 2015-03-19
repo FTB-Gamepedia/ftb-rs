@@ -1,20 +1,22 @@
 // Copyright © 2014, Peter Atashian
 
-#![feature(core, env, old_io, old_path, plugin, std_misc)]
+#![feature(core, env, fs_walk, old_io, old_path, path_ext, plugin, slice_patterns, std_misc)]
 #![plugin(regex_macros)]
 
 extern crate image;
 extern crate lodepng;
 extern crate regex;
-extern crate "rustc-serialize" as serialize;
+extern crate rustc_serialize;
 
 use image::{GenericImage, ImageBuffer, Pixel, Rgba, RgbaImage};
-use image::ColorType::RGBA;
-use std::borrow::ToOwned;
-use std::collections::HashMap;
-use std::old_io::{BufferedReader, BufferedWriter, File};
-use std::old_io::fs::{PathExtensions, copy, walk_dir};
+use image::ColorType::{RGBA};
+use std::borrow::{ToOwned};
+use std::collections::{HashMap};
+use std::fs::{File, copy, walk_dir};
+use std::io::prelude::*;
+use std::io::{BufReader, BufWriter};
 use std::num::{Float};
+use std::path::{Path};
 
 mod tilesheets;
 #[allow(unused_variables, non_snake_case)]
@@ -28,7 +30,8 @@ fn save(img: &RgbaImage, path: &Path) {
 fn read_gt_lang() -> HashMap<String, String> {
     let path = Path::new(r"work/GregTech.lang");
     let mut file = File::open(&path).unwrap();
-    let data = file.read_to_string().unwrap();
+    let mut data = String::new();
+    file.read_to_string(&mut data).unwrap();
     let reg = regex!(r"S:([\w\.]+?)=(.+?)\r?\n");
     reg.captures_iter(data.as_slice()).map(|cap|
         (cap.at(1).unwrap().to_owned(), cap.at(2).unwrap().to_owned())
@@ -93,8 +96,8 @@ fn resize(img: &FloatImage, width: u32, height: u32) -> FloatImage {
             let (x1, x2) = ((x as f32 * rw) as u32, ((x + 1) as f32 * rw) as u32);
             let (y1, y2) = ((y as f32 * rh) as u32, ((y + 1) as f32 * rh) as u32);
             let (mut r, mut g, mut b, mut a) = (0., 0., 0., 0.);
-            for xx in range(x1, x2) {
-                for yy in range(y1, y2) {
+            for xx in x1..x2 {
+                for yy in y1..y2 {
                     let p = img[(xx, yy)];
                     r += p[0];
                     g += p[1];
@@ -120,10 +123,11 @@ fn grab_crops() {
     let path = Path::new(r"C:\Users\Peter\Minecraft\Wiki\GT Dev\assets\ic2\textures\blocks\crop");
     let out = Path::new(r"work\tilesheets\Crops");
     let reg = regex!(r"blockCrop\.(.*)\.(.*)");
-    for path in walk_dir(&path).unwrap() {
+    for entry in walk_dir(&path).unwrap() {
+        let path = entry.unwrap().path();
         if !path.is_file() { continue }
-        if path.extension_str() != Some("png") { continue }
-        let name = path.filestem_str().unwrap();
+        if path.extension().and_then(|x| x.to_str()) != Some("png") { continue }
+        let name = path.file_stem().unwrap().to_str().unwrap();
         let cap = reg.captures(name).unwrap();
         let new = format!("Crop {} ({}).png", cap.at(1).unwrap(), cap.at(2).unwrap());
         let newp = out.join(new);
@@ -153,7 +157,8 @@ fn import_old_tilesheet(name: &str) {
     if !path.is_file() { return }
     println!("Importing old tilesheet");
     let mut file = File::open(&path).unwrap();
-    let data = file.read_to_string().unwrap();
+    let mut data = String::new();
+    file.read_to_string(&mut data).unwrap();
     let name = format!("work/tilesheets/Tilesheet {}.txt", name);
     let path = Path::new(&name);
     let mut out = File::create(&path).unwrap();
@@ -168,7 +173,8 @@ fn import_old_tilesheet(name: &str) {
 fn fix_lang() {
     let path = Path::new(r"work/GregTech.lang");
     let mut file = File::open(&path).unwrap();
-    let data = file.read_to_string().unwrap();
+    let mut data = String::new();
+    file.read_to_string(&mut data).unwrap();
     let data = regex!("\r").replace_all(&data, "");
     let data = regex!("(blockores\\.[0-9]{1,3}\\.name=.*)").replace_all(&data, "$1 (Stone)");
     let data = regex!("(blockores\\.1[0-9]{3}\\.name=.*)").replace_all(&data, "$1 (Netherrack)");
@@ -183,7 +189,7 @@ fn fix_lang() {
     let data = regex!("(S:fluid\\..*=.*)").replace_all(&data, "$1 (Fluid)");
     drop(file);
     let mut file = File::create(&path).unwrap();
-    file.write_str(&data).unwrap();
+    write!(&mut file, "{}", data).unwrap();
 }
 
 fn dump_oredict() {
@@ -191,8 +197,8 @@ fn dump_oredict() {
     let reg = regex!("^([0-9]+)x(.+)@([0-9]+)$");
     let fin = File::open(&Path::new(r"work/neiintegration_oredict.csv")).unwrap();
     let fout = File::create(&Path::new(r"work/oredict.txt")).unwrap();
-    let mut fin = BufferedReader::new(fin);
-    let mut fout = BufferedWriter::new(fout);
+    let mut fin = BufReader::new(fin);
+    let mut fout = BufWriter::new(fout);
     for line in fin.lines() {
         let line = line.unwrap();
         let parts = line.trim().split(',').collect::<Vec<_>>();
@@ -210,11 +216,10 @@ fn dump_oredict() {
         let item = cap.at(2).unwrap();
         let meta = cap.at(3).unwrap();
         let unlocal = format!("{}.{}.name", item, meta);
-        if !lang.contains_key(&unlocal) {
-            println!("Missing: {}", unlocal);
-            continue
+        match lang.get(&unlocal) {
+            Some(thing) => writeln!(&mut fout, "{}!{}!GT!!", tag, &thing).unwrap(),
+            None => println!("Missing: {}", unlocal),
         }
-        writeln!(&mut fout, "{}!{}!GT!!", tag, lang[unlocal]).unwrap();
     }
 }
 
