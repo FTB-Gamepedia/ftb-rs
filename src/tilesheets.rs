@@ -62,8 +62,8 @@ impl TilesheetManager {
         }
     }
     fn update(&mut self) {
-        let path = Path::new(r"work\tilesheets").join(self.name.as_slice());
-        let mut file = File::create(&Path::new(r"work\tilesheets\Added.txt")).unwrap();
+        let path = Path::new(r"work/tilesheets").join(&self.name);
+        let mut file = File::create(&Path::new(r"work/tilesheets/Added.txt")).unwrap();
         let renames = if let Ok(mut file) = File::open(&path.join("renames.txt")) {
             let reg = regex!("(.*)=(.*)");
             let mut s = String::new();
@@ -94,7 +94,7 @@ impl TilesheetManager {
         }
     }
     fn clear_unused(&mut self) {
-        let path = Path::new(r"work\tilesheets").join(self.name.as_slice());
+        let path = Path::new(r"work/tilesheets").join(&self.name);
         let names: HashSet<_> = walk_dir(&path).unwrap().filter_map(|entry| {
             let path = match entry {
                 Ok(x) => x.path(),
@@ -104,7 +104,7 @@ impl TilesheetManager {
             else if path.extension().and_then(|x| x.to_str()) != Some("png") { None }
             else { Some(path.file_stem().unwrap().to_str().unwrap().to_owned()) }
         }).collect();
-        let mut file = File::create(&Path::new(r"work\tilesheets\Deleted.txt")).unwrap();
+        let mut file = File::create(&Path::new(r"work/tilesheets/Deleted.txt")).unwrap();
         let lookup = self.lookup.drain().filter(|&(ref name, _)| {
             if !names.contains(name) {
                 writeln!(&mut file, "{}", name).unwrap();
@@ -120,12 +120,12 @@ impl TilesheetManager {
     fn save(&self) {
         let _optipng = self.tilesheets.iter().map(|tilesheet| {
             let name = format!("Tilesheet {} {}.png", self.name, tilesheet.size);
-            let path = Path::new(r"work\tilesheets").join(name.as_slice());
+            let path = Path::new(r"work/tilesheets").join(name);
             save(&tilesheet.img, &path);
             Command::new("optipng").arg(path).spawn().unwrap()
         }).collect::<Vec<_>>();
         let name = format!("Tilesheet {}.txt", self.name);
-        let path = Path::new(r"work\tilesheets").join(name.as_slice());
+        let path = Path::new(r"work/tilesheets").join(name);
         let mut file = BufWriter::new(File::create(&path).unwrap());
         let mut stuff = self.entries.iter().map(|(&(x, y), tile)| (x, y, tile)).collect::<Vec<_>>();
         stuff.sort_by(|a, b| if a.1 == b.1 { a.0.cmp(&b.0) } else { a.1.cmp(&b.1) });
@@ -165,7 +165,7 @@ impl TilesheetManager {
 fn load_tiles(name: &str) -> HashMap<String, (u32, u32)> {
     let reg = regex!(r"(\d+) (\d+) (.+?)\r?\n");
     let name = format!("Tilesheet {}.txt", name);
-    let path = Path::new(r"work\tilesheets").join(name.as_slice());
+    let path = Path::new(r"work/tilesheets").join(name);
     let mut file = match File::open(&path) {
         Ok(x) => x,
         Err(_) => {
@@ -175,7 +175,7 @@ fn load_tiles(name: &str) -> HashMap<String, (u32, u32)> {
     };
     let mut data = String::new();
     file.read_to_string(&mut data).unwrap();
-    reg.captures_iter(data.as_slice()).map(|cap| {
+    reg.captures_iter(&data).map(|cap| {
         let x = cap.at(1).unwrap().parse().unwrap();
         let y = cap.at(2).unwrap().parse().unwrap();
         let name = cap.at(3).unwrap().to_owned();
@@ -187,7 +187,7 @@ fn load_entries(tiles: &HashMap<String, (u32, u32)>) -> HashMap<(u32, u32), Stri
 }
 fn load_tilesheet(name: &str, size: u32) -> Tilesheet {
     let name = format!("Tilesheet {} {}.png", name, size);
-    let path = Path::new(r"work\tilesheets").join(name.as_slice());
+    let path = Path::new(r"work/tilesheets").join(name);
     let img = match image::open(&path) {
         Ok(img) => img.to_rgba(),
         Err(_) => ImageBuffer::new(size, size),

@@ -24,7 +24,7 @@ mod oregen;
 
 type FloatImage = ImageBuffer<Rgba<f32>, Vec<f32>>;
 fn save(img: &RgbaImage, path: &Path) {
-    image::save_buffer(path, img.as_slice(), img.width(), img.height(), RGBA(8)).unwrap();
+    image::save_buffer(path, img, img.width(), img.height(), RGBA(8)).unwrap();
 }
 
 fn read_gt_lang() -> HashMap<String, String> {
@@ -33,7 +33,7 @@ fn read_gt_lang() -> HashMap<String, String> {
     let mut data = String::new();
     file.read_to_string(&mut data).unwrap();
     let reg = regex!(r"S:([\w\.]+?)=(.+?)\r?\n");
-    reg.captures_iter(data.as_slice()).map(|cap|
+    reg.captures_iter(&data).map(|cap|
         (cap.at(1).unwrap().to_owned(), cap.at(2).unwrap().to_owned())
     ).collect()
 }
@@ -120,8 +120,8 @@ fn resize(img: &FloatImage, width: u32, height: u32) -> FloatImage {
     }
 }
 fn grab_crops() {
-    let path = Path::new(r"C:\Users\Peter\Minecraft\Wiki\GT Dev\assets\ic2\textures\blocks\crop");
-    let out = Path::new(r"work\tilesheets\Crops");
+    let path = Path::new(r"C:/Users/Peter/Minecraft/Wiki/GT Dev/assets/ic2/textures/blocks/crop");
+    let out = Path::new(r"work/tilesheets/Crops");
     let reg = regex!(r"blockCrop\.(.*)\.(.*)");
     for entry in walk_dir(&path).unwrap() {
         let path = entry.unwrap().path();
@@ -138,10 +138,10 @@ fn check_lang_dups() {
     let lang = read_gt_lang();
     let mut stuff = HashMap::new();
     for (key, val) in lang.iter() {
-        if !key.as_slice().contains(".name") { continue }
-        if key.as_slice().contains(".tooltip") { continue }
-        if key.as_slice().contains("gt.recipe") { continue }
-        if key.as_slice().contains("DESCRIPTION") { continue }
+        if !key.contains(".name") { continue }
+        if key.contains(".tooltip") { continue }
+        if key.contains("gt.recipe") { continue }
+        if key.contains("DESCRIPTION") { continue }
         match stuff.get(val) {
             Some(other) => {
                 println!("Collision for {}", val);
@@ -163,7 +163,7 @@ fn import_old_tilesheet(name: &str) {
     let path = Path::new(&name);
     let mut out = File::create(&path).unwrap();
     let reg = regex!(r"Edit\s+[0-9]+\s+(.+?)\s+[A-Z0-9]+\s+([0-9]+)\s+([0-9]+)\s+16px, 32px\r?\n");
-    for cap in reg.captures_iter(data.as_slice()) {
+    for cap in reg.captures_iter(&data) {
         let name = cap.at(1).unwrap();
         let x = cap.at(2).unwrap();
         let y = cap.at(3).unwrap();
