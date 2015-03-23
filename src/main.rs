@@ -1,6 +1,6 @@
 // Copyright © 2014, Peter Atashian
 
-#![feature(core, env, fs_walk, old_io, old_path, path_ext, plugin, slice_patterns, std_misc)]
+#![feature(fs_walk, path_ext, plugin, slice_patterns, std_misc)]
 #![plugin(regex_macros)]
 
 extern crate image;
@@ -197,7 +197,7 @@ fn dump_oredict() {
     let reg = regex!("^([0-9]+)x(.+)@([0-9]+)$");
     let fin = File::open(&Path::new(r"work/neiintegration_oredict.csv")).unwrap();
     let fout = File::create(&Path::new(r"work/oredict.txt")).unwrap();
-    let mut fin = BufReader::new(fin);
+    let fin = BufReader::new(fin);
     let mut fout = BufWriter::new(fout);
     for line in fin.lines() {
         let line = line.unwrap();

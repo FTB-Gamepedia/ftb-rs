@@ -11,7 +11,7 @@ dependencies = [
 
 [[package]]
 name = "byteorder"
-version = "0.3.7"
+version = "0.3.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -19,7 +19,7 @@ name = "enum_primitive"
 version = "0.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "num 0.1.22 (registry+https://github.com/rust-lang/crates.io-index)",
+ "num 0.1.23 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -32,9 +32,9 @@ name = "image"
 version = "0.3.7"
 source = "git+https://github.com/PistonDevelopers/image#b720b8529cb8edbf4cdfc302ec144f402c990953"
 dependencies = [
- "byteorder 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "byteorder 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "enum_primitive 0.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "num 0.1.22 (registry+https://github.com/rust-lang/crates.io-index)",
+ "num 0.1.23 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -62,7 +62,7 @@ dependencies = [
 
 [[package]]
 name = "num"
-version = "0.1.22"
+version = "0.1.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "rand 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
