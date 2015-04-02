@@ -8,7 +8,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs::{File, walk_dir};
 use std::io::prelude::*;
 use std::io::{BufWriter};
-use std::process::{Command};
+use std::process::{Command, Stdio};
 use std::mem::{swap};
 use std::path::{Path};
 use {FloatImage, decode_srgb, encode_srgb, resize, save};
@@ -122,7 +122,8 @@ impl TilesheetManager {
             let name = format!("Tilesheet {} {}.png", self.name, tilesheet.size);
             let path = Path::new(r"work/tilesheets").join(name);
             save(&tilesheet.img, &path);
-            Command::new("optipng").arg(path).spawn().unwrap()
+            Command::new("optipng").arg(path).stdin(Stdio::null()).stdout(Stdio::null())
+                .stderr(Stdio::null()).spawn().unwrap()
         }).collect::<Vec<_>>();
         let name = format!("Tilesheet {}.txt", self.name);
         let path = Path::new(r"work/tilesheets").join(name);

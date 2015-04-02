@@ -2,7 +2,7 @@
 name = "ftb"
 version = "0.0.1"
 dependencies = [
- "image 0.3.8 (git+https://github.com/PistonDevelopers/image)",
+ "image 0.3.9 (git+https://github.com/PistonDevelopers/image)",
  "lodepng 0.0.1 (git+https://github.com/retep998/lodepng-rs)",
  "regex 0.1.30 (registry+https://github.com/rust-lang/crates.io-index)",
  "regex_macros 0.1.17 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -29,8 +29,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "image"
-version = "0.3.8"
-source = "git+https://github.com/PistonDevelopers/image#36f3020cb9927cf1625583bf561cbf3a8dcc302f"
+version = "0.3.9"
+source = "git+https://github.com/PistonDevelopers/image#10199d3e34494694d4bba5cde59fd88813e6573d"
 dependencies = [
  "byteorder 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "enum_primitive 0.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -39,7 +39,7 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.1.6"
+version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -48,8 +48,8 @@ version = "0.0.1"
 source = "git+https://github.com/retep998/lodepng-rs#5c5462819f9eddc5cb9a79834912bb885161ddc3"
 dependencies = [
  "gcc 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "image 0.3.8 (git+https://github.com/PistonDevelopers/image)",
- "libc 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "image 0.3.9 (git+https://github.com/PistonDevelopers/image)",
+ "libc 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -66,7 +66,7 @@ name = "rand"
 version = "0.3.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "libc 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
