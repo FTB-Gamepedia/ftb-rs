@@ -1,6 +1,6 @@
 // Copyright © 2014, Peter Atashian
 
-#![feature(fs_walk, path_ext, plugin, slice_patterns, std_misc)]
+#![feature(fs_walk, path_ext, plugin, slice_patterns, drain)]
 #![plugin(regex_macros)]
 
 extern crate image;
