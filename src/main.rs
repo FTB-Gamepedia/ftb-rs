@@ -1,15 +1,14 @@
 // Copyright © 2014, Peter Atashian
 
-#![feature(fs_walk, path_ext, plugin, slice_patterns, drain)]
-#![plugin(regex_macros)]
+#![feature(fs_walk, path_ext, slice_patterns, drain)]
 
 extern crate image;
-extern crate lodepng;
 extern crate regex;
 extern crate rustc_serialize;
 
 use image::{GenericImage, ImageBuffer, Pixel, Rgba, RgbaImage};
 use image::ColorType::{RGBA};
+use regex::{Regex};
 use std::borrow::{ToOwned};
 use std::collections::{HashMap};
 use std::fs::{File, copy, walk_dir};
@@ -31,7 +30,7 @@ fn read_gt_lang() -> HashMap<String, String> {
     let mut file = File::open(&path).unwrap();
     let mut data = String::new();
     file.read_to_string(&mut data).unwrap();
-    let reg = regex!(r"S:([\w\.]+?)=(.+?)\r?\n");
+    let reg = Regex::new(r"S:([\w\.]+?)=(.+?)\r?\n").unwrap();
     reg.captures_iter(&data).map(|cap|
         (cap.at(1).unwrap().to_owned(), cap.at(2).unwrap().to_owned())
     ).collect()
@@ -121,7 +120,7 @@ fn resize(img: &FloatImage, width: u32, height: u32) -> FloatImage {
 fn grab_crops() {
     let path = Path::new(r"C:/Users/Peter/Minecraft/Wiki/GT Dev/assets/ic2/textures/blocks/crop");
     let out = Path::new(r"work/tilesheets/Crops");
-    let reg = regex!(r"blockCrop\.(.*)\.(.*)");
+    let reg = Regex::new(r"blockCrop\.(.*)\.(.*)").unwrap();
     for entry in walk_dir(&path).unwrap() {
         let path = entry.unwrap().path();
         if !path.is_file() { continue }
@@ -161,7 +160,7 @@ fn import_old_tilesheet(name: &str) {
     let name = format!("work/tilesheets/Tilesheet {}.txt", name);
     let path = Path::new(&name);
     let mut out = File::create(&path).unwrap();
-    let reg = regex!(r"Edit\s+[0-9]+\s+(.+?)\s+[A-Z0-9]+\s+([0-9]+)\s+([0-9]+)\s+16px, 32px\r?\n");
+    let reg = Regex::new(r"Edit\s+[0-9]+\s+(.+?)\s+[A-Z0-9]+\s+([0-9]+)\s+([0-9]+)\s+16px, 32px\r?\n").unwrap();
     for cap in reg.captures_iter(&data) {
         let name = cap.at(1).unwrap();
         let x = cap.at(2).unwrap();
@@ -174,18 +173,18 @@ fn fix_lang() {
     let mut file = File::open(&path).unwrap();
     let mut data = String::new();
     file.read_to_string(&mut data).unwrap();
-    let data = regex!("\r").replace_all(&data, "");
-    let data = regex!("(blockores\\.[0-9]{1,3}\\.name=.*)").replace_all(&data, "$1 (Stone)");
-    let data = regex!("(blockores\\.1[0-9]{3}\\.name=.*)").replace_all(&data, "$1 (Netherrack)");
-    let data = regex!("(blockores\\.2[0-9]{3}\\.name=.*)").replace_all(&data, "$1 (Endstone)");
-    let data = regex!("(blockores\\.3[0-9]{3}\\.name=.*)").replace_all(&data, "$1 (Black Granite)");
-    let data = regex!("(blockores\\.4[0-9]{3}\\.name=.*)").replace_all(&data, "$1 (Red Granite)");
-    let data = regex!("(blockores\\.16[0-9]{3}\\.name=.*)").replace_all(&data, "$1 (Stone)");
-    let data = regex!("(blockores\\.17[0-9]{3}\\.name=.*)").replace_all(&data, "$1 (Netherrack)");
-    let data = regex!("(blockores\\.18[0-9]{3}\\.name=.*)").replace_all(&data, "$1 (Endstone)");
-    let data = regex!("(blockores\\.19[0-9]{3}\\.name=.*)").replace_all(&data, "$1 (Black Granite)");
-    let data = regex!("(blockores\\.20[0-9]{3}\\.name=.*)").replace_all(&data, "$1 (Red Granite)");
-    let data = regex!("(S:fluid\\..*=.*)").replace_all(&data, "$1 (Fluid)");
+    let data = Regex::new("\r").unwrap().replace_all(&data, "");
+    let data = Regex::new("(blockores\\.[0-9]{1,3}\\.name=.*)").unwrap().replace_all(&data, "$1 (Stone)");
+    let data = Regex::new("(blockores\\.1[0-9]{3}\\.name=.*)").unwrap().replace_all(&data, "$1 (Netherrack)");
+    let data = Regex::new("(blockores\\.2[0-9]{3}\\.name=.*)").unwrap().replace_all(&data, "$1 (Endstone)");
+    let data = Regex::new("(blockores\\.3[0-9]{3}\\.name=.*)").unwrap().replace_all(&data, "$1 (Black Granite)");
+    let data = Regex::new("(blockores\\.4[0-9]{3}\\.name=.*)").unwrap().replace_all(&data, "$1 (Red Granite)");
+    let data = Regex::new("(blockores\\.16[0-9]{3}\\.name=.*)").unwrap().replace_all(&data, "$1 (Stone)");
+    let data = Regex::new("(blockores\\.17[0-9]{3}\\.name=.*)").unwrap().replace_all(&data, "$1 (Netherrack)");
+    let data = Regex::new("(blockores\\.18[0-9]{3}\\.name=.*)").unwrap().replace_all(&data, "$1 (Endstone)");
+    let data = Regex::new("(blockores\\.19[0-9]{3}\\.name=.*)").unwrap().replace_all(&data, "$1 (Black Granite)");
+    let data = Regex::new("(blockores\\.20[0-9]{3}\\.name=.*)").unwrap().replace_all(&data, "$1 (Red Granite)");
+    let data = Regex::new("(S:fluid\\..*=.*)").unwrap().replace_all(&data, "$1 (Fluid)");
     drop(file);
     let mut file = File::create(&path).unwrap();
     write!(&mut file, "{}", data).unwrap();
@@ -193,7 +192,7 @@ fn fix_lang() {
 
 fn dump_oredict() {
     let lang = read_gt_lang();
-    let reg = regex!("^([0-9]+)x(.+)@([0-9]+)$");
+    let reg = Regex::new("^([0-9]+)x(.+)@([0-9]+)$").unwrap();
     let fin = File::open(&Path::new(r"work/neiintegration_oredict.csv")).unwrap();
     let fout = File::create(&Path::new(r"work/oredict.txt")).unwrap();
     let fin = BufReader::new(fin);

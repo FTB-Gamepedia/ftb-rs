@@ -1,7 +1,7 @@
 // Copyright © 2014, Peter Atashian
 
 use image::{self, GenericImage, ImageBuffer, Pixel, RgbaImage};
-use lodepng::{load};
+use regex::{Regex};
 use std::borrow::{ToOwned};
 use std::cmp::{max};
 use std::collections::{HashMap, HashSet};
@@ -65,7 +65,7 @@ impl TilesheetManager {
         let path = Path::new(r"work/tilesheets").join(&self.name);
         let mut file = File::create(&Path::new(r"work/tilesheets/Added.txt")).unwrap();
         let renames = if let Ok(mut file) = File::open(&path.join("renames.txt")) {
-            let reg = regex!("(.*)=(.*)");
+            let reg = Regex::new("(.*)=(.*)").unwrap();
             let mut s = String::new();
             file.read_to_string(&mut s).unwrap();
             s.lines_any().map(|line| {
@@ -82,7 +82,7 @@ impl TilesheetManager {
             let name = path.file_stem().unwrap().to_str().unwrap();
             let name = if let Some(r) = renames.get(name) { &**r } else { name };
             if name.contains("_") { panic!("Illegal name: {:?}", name) }
-            let img = load(&path).unwrap();
+            let img = image::open(&path).unwrap().to_rgba();
             let img = decode_srgb(&img);
             let (x, y, new) = self.lookup(name);
             if new {
@@ -164,7 +164,7 @@ impl TilesheetManager {
     }
 }
 fn load_tiles(name: &str) -> HashMap<String, (u32, u32)> {
-    let reg = regex!(r"(\d+) (\d+) (.+?)\r?\n");
+    let reg = Regex::new(r"(\d+) (\d+) (.+?)\r?\n").unwrap();
     let name = format!("Tilesheet {}.txt", name);
     let path = Path::new(r"work/tilesheets").join(name);
     let mut file = match File::open(&path) {
