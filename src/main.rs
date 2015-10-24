@@ -1,4 +1,4 @@
-// Copyright © 2014, Peter Atashian
+// Copyright © 2015, Peter Atashian
 
 #![feature(fs_walk, path_ext, slice_patterns, drain)]
 

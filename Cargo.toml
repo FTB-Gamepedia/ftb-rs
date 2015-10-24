@@ -6,6 +6,5 @@ authors = ["Peter Atashian <retep998@gmail.com>"]
 
 [dependencies]
 regex = "*"
-regex_macros = "*"
 rustc-serialize = "*"
-image = { version = "*", features = ["png"] }
+image = { version = "*", features = ["png_codec"], default-features = false }

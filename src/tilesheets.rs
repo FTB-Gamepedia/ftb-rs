@@ -1,4 +1,4 @@
-// Copyright © 2014, Peter Atashian
+// Copyright © 2015, Peter Atashian
 
 use image::{self, GenericImage, ImageBuffer, Pixel, RgbaImage};
 use regex::{Regex};
@@ -68,7 +68,7 @@ impl TilesheetManager {
             let reg = Regex::new("(.*)=(.*)").unwrap();
             let mut s = String::new();
             file.read_to_string(&mut s).unwrap();
-            s.lines_any().map(|line| {
+            s.lines().map(|line| {
                 let cap = reg.captures(line).unwrap();
                 (cap.at(1).unwrap().to_owned(), cap.at(2).unwrap().to_owned())
             }).collect()
@@ -81,7 +81,7 @@ impl TilesheetManager {
             if path.extension().and_then(|x| x.to_str()) != Some("png") { continue }
             let name = path.file_stem().unwrap().to_str().unwrap();
             let name = if let Some(r) = renames.get(name) { &**r } else { name };
-            if name.contains("_") { panic!("Illegal name: {:?}", name) }
+            if name.contains(&['_', '[', ']'][..]) { panic!("Illegal name: {:?}", name) }
             let img = image::open(&path).unwrap().to_rgba();
             let img = decode_srgb(&img);
             let (x, y, new) = self.lookup(name);
