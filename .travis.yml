@@ -1,5 +1,6 @@
 language: rust
 sudo: false
+rust: nightly
 script:
   - cargo build --verbose
   - cargo test --verbose
@@ -8,7 +9,7 @@ notifications:
   email: false
   irc:
     channels:
-      - "irc.fyrechat.net#vana-commits"
+      - "irc.esper.net#FTB-Wiki-Dev"
     template:
       - "%{repository_slug}/%{branch} (%{commit} - %{author}): %{message}"
     skip_join: true
