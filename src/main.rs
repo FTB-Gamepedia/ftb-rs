@@ -1,6 +1,6 @@
 // Copyright © 2015, Peter Atashian
 
-#![feature(fs_walk, path_ext, slice_patterns, drain)]
+#![feature(fs_walk, slice_patterns, drain)]
 
 extern crate image;
 extern crate regex;
