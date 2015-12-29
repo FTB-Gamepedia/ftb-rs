@@ -1,10 +1,14 @@
 [package]
-
+authors = ["Peter Atashian <retep998@gmail.com>"]
 name = "ftb"
 version = "0.0.1"
-authors = ["Peter Atashian <retep998@gmail.com>"]
 
 [dependencies]
 regex = "*"
 rustc-serialize = "*"
-image = { version = "*", features = ["png_codec"], default-features = false }
+walkdir = "0.1.5"
+
+[dependencies.image]
+default-features = false
+features = ["png_codec"]
+version = "*"

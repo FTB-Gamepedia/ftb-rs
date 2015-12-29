@@ -1,17 +1,18 @@
 // Copyright © 2015, Peter Atashian
 
-#![feature(fs_walk, slice_patterns, drain)]
+#![feature(slice_patterns)]
 
 extern crate image;
 extern crate regex;
 extern crate rustc_serialize;
+extern crate walkdir;
 
 use image::{GenericImage, ImageBuffer, Pixel, Rgba, RgbaImage};
 use image::ColorType::{RGBA};
 use regex::{Regex};
 use std::borrow::{ToOwned};
 use std::collections::{HashMap};
-use std::fs::{File, copy, walk_dir};
+use std::fs::{File};
 use std::io::prelude::*;
 use std::io::{BufReader, BufWriter};
 use std::path::{Path};
@@ -117,21 +118,6 @@ fn resize(img: &FloatImage, width: u32, height: u32) -> FloatImage {
         })
     }
 }
-fn grab_crops() {
-    let path = Path::new(r"C:/Users/Peter/Minecraft/Wiki/GT Dev/assets/ic2/textures/blocks/crop");
-    let out = Path::new(r"work/tilesheets/Crops");
-    let reg = Regex::new(r"blockCrop\.(.*)\.(.*)").unwrap();
-    for entry in walk_dir(&path).unwrap() {
-        let path = entry.unwrap().path();
-        if !path.is_file() { continue }
-        if path.extension().and_then(|x| x.to_str()) != Some("png") { continue }
-        let name = path.file_stem().unwrap().to_str().unwrap();
-        let cap = reg.captures(name).unwrap();
-        let new = format!("Crop {} ({}).png", cap.at(1).unwrap(), cap.at(2).unwrap());
-        let newp = out.join(new);
-        copy(&path, &newp).unwrap();
-    }
-}
 fn check_lang_dups() {
     let lang = read_gt_lang();
     let mut stuff = HashMap::new();
@@ -232,7 +218,6 @@ fn main() {
         ["langdup"] => check_lang_dups(),
         ["dumporedict"] => dump_oredict(),
         ["oregen"] => oregen::oregen(),
-        ["crops"] => grab_crops(),
         _ => println!("Invalid arguments"),
     }
 }

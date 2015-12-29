@@ -5,12 +5,13 @@ use regex::{Regex};
 use std::borrow::{ToOwned};
 use std::cmp::{max};
 use std::collections::{HashMap, HashSet};
-use std::fs::{File, walk_dir};
+use std::fs::{File};
 use std::io::prelude::*;
 use std::io::{BufWriter};
 use std::process::{Command, Stdio};
 use std::mem::{swap};
 use std::path::{Path};
+use walkdir::{WalkDir};
 use {FloatImage, decode_srgb, encode_srgb, resize, save};
 
 struct Tilesheet {
@@ -75,8 +76,9 @@ impl TilesheetManager {
         } else {
             HashMap::new()
         };
-        for entry in walk_dir(&path).unwrap() {
-            let path = entry.unwrap().path();
+        for entry in WalkDir::new(&path) {
+            let entry = entry.unwrap();
+            let path = entry.path();
             if !path.is_file() { continue }
             if path.extension().and_then(|x| x.to_str()) != Some("png") { continue }
             let name = path.file_stem().unwrap().to_str().unwrap();
@@ -95,11 +97,9 @@ impl TilesheetManager {
     }
     fn clear_unused(&mut self) {
         let path = Path::new(r"work/tilesheets").join(&self.name);
-        let names: HashSet<_> = walk_dir(&path).unwrap().filter_map(|entry| {
-            let path = match entry {
-                Ok(x) => x.path(),
-                Err(_) => return None,
-            };
+        let names: HashSet<_> = WalkDir::new(&path).into_iter().filter_map(|entry| {
+            let entry = match entry { Ok(x) => x, Err(_) => return None };
+            let path = entry.path();
             if !path.is_file() { None }
             else if path.extension().and_then(|x| x.to_str()) != Some("png") { None }
             else { Some(path.file_stem().unwrap().to_str().unwrap().to_owned()) }
