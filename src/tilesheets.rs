@@ -1,6 +1,6 @@
 // Copyright © 2015, Peter Atashian
 
-use image::{self, GenericImage, ImageBuffer, Pixel, RgbaImage};
+use image::{self, ImageBuffer, RgbaImage};
 use regex::{Regex};
 use std::borrow::{ToOwned};
 use std::cmp::{max};
@@ -46,6 +46,7 @@ struct TilesheetManager {
     name: String,
     lookup: HashMap<String, (u32, u32)>,
     entries: HashMap<(u32, u32), String>,
+    renames: HashMap<String, String>,
     tilesheets: Vec<Tilesheet>,
     next: (u32, u32),
 }
@@ -58,6 +59,7 @@ impl TilesheetManager {
             name: name.to_owned(),
             lookup: lookup,
             entries: entries,
+            renames: load_renames(name),
             tilesheets: tilesheets,
             next: (0, 0),
         }
@@ -65,28 +67,21 @@ impl TilesheetManager {
     fn update(&mut self) {
         let path = Path::new(r"work/tilesheets").join(&self.name);
         let mut file = File::create(&Path::new(r"work/tilesheets/Added.txt")).unwrap();
-        let renames = if let Ok(mut file) = File::open(&path.join("renames.txt")) {
-            let reg = Regex::new("(.*)=(.*)").unwrap();
-            let mut s = String::new();
-            file.read_to_string(&mut s).unwrap();
-            s.lines().map(|line| {
-                let cap = reg.captures(line).unwrap();
-                (cap.at(1).unwrap().to_owned(), cap.at(2).unwrap().to_owned())
-            }).collect()
-        } else {
-            HashMap::new()
-        };
         for entry in WalkDir::new(&path) {
             let entry = entry.unwrap();
             let path = entry.path();
             if !path.is_file() { continue }
             if path.extension().and_then(|x| x.to_str()) != Some("png") { continue }
             let name = path.file_stem().unwrap().to_str().unwrap();
-            let name = if let Some(r) = renames.get(name) { &**r } else { name };
+            let name = if let Some(r) = self.renames.get(name) {
+                r.clone()
+            } else {
+                name.to_owned()
+            };
             if name.contains(&['_', '[', ']'][..]) { panic!("Illegal name: {:?}", name) }
             let img = image::open(&path).unwrap().to_rgba();
             let img = decode_srgb(&img);
-            let (x, y, new) = self.lookup(name);
+            let (x, y, new) = self.lookup(&name);
             if new {
                 writeln!(&mut file, "{} {} {}", x, y, name).unwrap();
             }
@@ -102,7 +97,10 @@ impl TilesheetManager {
             let path = entry.path();
             if !path.is_file() { None }
             else if path.extension().and_then(|x| x.to_str()) != Some("png") { None }
-            else { Some(path.file_stem().unwrap().to_str().unwrap().to_owned()) }
+            else {
+                let name = path.file_stem().unwrap().to_str().unwrap();
+                Some(if let Some(r) = self.renames.get(name) { &**r } else { name }.to_owned())
+            }
         }).collect();
         let mut file = File::create(&Path::new(r"work/tilesheets/Deleted.txt")).unwrap();
         let lookup = self.lookup.drain().filter(|&(ref name, _)| {
@@ -128,7 +126,9 @@ impl TilesheetManager {
         let name = format!("Tilesheet {}.txt", self.name);
         let path = Path::new(r"work/tilesheets").join(name);
         let mut file = BufWriter::new(File::create(&path).unwrap());
-        let mut stuff = self.entries.iter().map(|(&(x, y), tile)| (x, y, tile)).collect::<Vec<_>>();
+        let mut stuff = self.entries.iter().map(|(&(x, y), tile)| {
+            (x, y, tile)
+        }).collect::<Vec<_>>();
         stuff.sort_by(|a, b| if a.1 == b.1 { a.0.cmp(&b.0) } else { a.1.cmp(&b.1) });
         for &(x, y, tile) in stuff.iter() {
             (writeln!(&mut file, "{} {} {}", x, y, tile)).unwrap();
@@ -197,6 +197,20 @@ fn load_tilesheet(name: &str, size: u32) -> Tilesheet {
 }
 fn load_tilesheets(name: &str, sizes: &[u32]) -> Vec<Tilesheet> {
     sizes.iter().map(|&size| load_tilesheet(name, size)).collect()
+}
+fn load_renames(name: &str) -> HashMap<String, String> {
+    let path = Path::new(r"work/tilesheets").join(name);
+    if let Ok(mut file) = File::open(&path.join("renames.txt")) {
+        let reg = Regex::new("(.*)=(.*)").unwrap();
+        let mut s = String::new();
+        file.read_to_string(&mut s).unwrap();
+        s.lines().map(|line| {
+            let cap = reg.captures(line).unwrap();
+            (cap.at(1).unwrap().to_owned(), cap.at(2).unwrap().to_owned())
+        }).collect()
+    } else {
+        HashMap::new()
+    }
 }
 pub fn update_tilesheet(name: &str, sizes: &[u32], overwrite: bool) {
     println!("Loading tilesheet");

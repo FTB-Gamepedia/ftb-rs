@@ -7,7 +7,7 @@ extern crate regex;
 extern crate rustc_serialize;
 extern crate walkdir;
 
-use image::{GenericImage, ImageBuffer, Pixel, Rgba, RgbaImage};
+use image::{ImageBuffer, Rgba, RgbaImage};
 use image::ColorType::{RGBA};
 use regex::{Regex};
 use std::borrow::{ToOwned};
@@ -146,12 +146,36 @@ fn import_old_tilesheet(name: &str) {
     let name = format!("work/tilesheets/Tilesheet {}.txt", name);
     let path = Path::new(&name);
     let mut out = File::create(&path).unwrap();
-    let reg = Regex::new(r"Edit\s+[0-9]+\s+(.+?)\s+[A-Z0-9]+\s+([0-9]+)\s+([0-9]+)\s+16px, 32px\r?\n").unwrap();
-    for cap in reg.captures_iter(&data) {
+    let reg = Regex::new(r"Edit\s+Translate\s+[0-9]+\s+(.+?)\s+[A-Z0-9-]+\s+([0-9]+)\s+([0-9]+)\s+16px, 32px").unwrap();
+    for line in data.lines() {
+        let cap = reg.captures(line).unwrap();
         let name = cap.at(1).unwrap();
         let x = cap.at(2).unwrap();
         let y = cap.at(3).unwrap();
         (writeln!(&mut out, "{} {} {}", x, y, name)).unwrap();
+    }
+}
+fn deleted_ids() {
+    println!("Converting tile names to IDs");
+    let mut file = File::open("work/tilesheets/import.txt").unwrap();
+    let mut data = String::new();
+    file.read_to_string(&mut data).unwrap();
+    let reg = Regex::new(r"Edit\s+Translate\s+([0-9]+)\s+(.+?)\s+[A-Z0-9-]+\s+[0-9]+\s+[0-9]+\s+16px, 32px").unwrap();
+    let map: HashMap<_, _> = data.lines().map(|line| {
+        let cap = reg.captures(line).unwrap();
+        let id = cap.at(1).unwrap();
+        let name = cap.at(2).unwrap();
+        (name, id)
+    }).collect();
+    let mut file = File::open("work/tilesheets/Deleted.txt").unwrap();
+    let mut data = String::new();
+    file.read_to_string(&mut data).unwrap();
+    let mut out = File::create("work/tilesheets/IDs.txt").unwrap();
+    let mut ids: Vec<_> = data.lines().map(|name| map[name]).collect();
+    ids.sort();
+    for chunk in ids.chunks(40) {
+        let ids = chunk.join("|");
+        writeln!(&mut out, "{}", ids).unwrap();
     }
 }
 fn fix_lang() {
@@ -218,6 +242,7 @@ fn main() {
         ["langdup"] => check_lang_dups(),
         ["dumporedict"] => dump_oredict(),
         ["oregen"] => oregen::oregen(),
+        ["todelete"] => deleted_ids(),
         _ => println!("Invalid arguments"),
     }
 }
