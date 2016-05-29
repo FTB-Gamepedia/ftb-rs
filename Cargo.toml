@@ -3,12 +3,11 @@ authors = ["Peter Atashian <retep998@gmail.com>"]
 name = "ftb"
 version = "0.0.1"
 
+[profile.release]
+debug = true
+
 [dependencies]
 regex = "*"
 rustc-serialize = "*"
 walkdir = "0.1.5"
-
-[dependencies.image]
-default-features = false
-features = ["png_codec"]
-version = "*"
+image = { default-features = false, features = ["png_codec"], version = "*" }

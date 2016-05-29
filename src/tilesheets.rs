@@ -205,7 +205,10 @@ fn load_renames(name: &str) -> HashMap<String, String> {
         let mut s = String::new();
         file.read_to_string(&mut s).unwrap();
         s.lines().map(|line| {
-            let cap = reg.captures(line).unwrap();
+            let cap = match reg.captures(line) {
+                Some(cap) => cap,
+                None => panic!("Invalid line in renames.txt {:?}", line),
+            };
             (cap.at(1).unwrap().to_owned(), cap.at(2).unwrap().to_owned())
         }).collect()
     } else {
