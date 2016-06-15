@@ -79,7 +79,17 @@ impl TilesheetManager {
                 name.to_owned()
             };
             if name.contains(&['_', '[', ']'][..]) { panic!("Illegal name: {:?}", name) }
-            let img = image::open(&path).unwrap().to_rgba();
+            let mut img = image::open(&path).unwrap().to_rgba();
+            for p in img.pixels_mut() {
+                if p[3] == 0 || p[3] == 255 { continue }
+                #[inline] fn unmult(x: u8, a: u8) -> u8 {
+                    let n = (x as u16) * 255 / (a as u16);
+                    if n > 255 { 255 } else { n as u8 }
+                }
+                p[0] = unmult(p[0], p[3]);
+                p[1] = unmult(p[1], p[3]);
+                p[2] = unmult(p[2], p[3]);
+            }
             let img = decode_srgb(&img);
             let (x, y, new) = self.lookup(&name);
             if new {

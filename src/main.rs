@@ -235,14 +235,14 @@ fn main() {
     let args: Vec<_> = std::env::args().collect();
     let args: Vec<_> = args.iter().map(|x| &**x).collect();
     match &args[1..] {
-        ["update", name] => tilesheets::update_tilesheet(name, &[16, 32], false),
-        ["overwrite", name] => tilesheets::update_tilesheet(name, &[16, 32], true),
-        ["import", name] => import_old_tilesheet(name),
-        ["fixlang"] => fix_lang(),
-        ["langdup"] => check_lang_dups(),
-        ["dumporedict"] => dump_oredict(),
-        ["oregen"] => oregen::oregen(),
-        ["todelete"] => deleted_ids(),
+        &["update", name] => tilesheets::update_tilesheet(name, &[16, 32], false),
+        &["overwrite", name] => tilesheets::update_tilesheet(name, &[16, 32], true),
+        &["import", name] => import_old_tilesheet(name),
+        &["fixlang"] => fix_lang(),
+        &["langdup"] => check_lang_dups(),
+        &["dumporedict"] => dump_oredict(),
+        &["oregen"] => oregen::oregen(),
+        &["todelete"] => deleted_ids(),
         _ => println!("Invalid arguments"),
     }
 }
