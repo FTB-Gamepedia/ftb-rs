@@ -170,8 +170,8 @@ fn shrink() {
         let mut img = image::open(path).unwrap().to_rgba();
         fix_translucent(&mut img);
         let img = decode_srgb(&img);
-        assert_eq!(img.dimensions(), (256, 256));
-        let img = resize(&img, 128, 128);
+        assert_eq!(img.dimensions(), (768, 768));
+        let img = resize(&img, 192, 192);
         let img = encode_srgb(&img);
         save(&img, format!("work/shrunk/Block {}", name).as_ref());
     }
