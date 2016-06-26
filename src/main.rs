@@ -10,32 +10,19 @@ extern crate walkdir;
 use image::{ImageBuffer, Rgba, RgbaImage};
 use image::ColorType::{RGBA};
 use regex::{Regex};
-use std::borrow::{ToOwned};
 use std::collections::{HashMap};
-use std::fs::{File};
+use std::fs::{File, create_dir};
 use std::io::prelude::*;
-use std::io::{BufReader, BufWriter};
 use std::path::{Path};
+use walkdir::{WalkDir};
 
 mod tilesheets;
-#[allow(unused_variables, non_snake_case)]
-mod oregen;
 
 type FloatImage = ImageBuffer<Rgba<f32>, Vec<f32>>;
 fn save(img: &RgbaImage, path: &Path) {
     image::save_buffer(path, img, img.width(), img.height(), RGBA(8)).unwrap();
 }
 
-fn read_gt_lang() -> HashMap<String, String> {
-    let path = Path::new(r"work/GregTech.lang");
-    let mut file = File::open(&path).unwrap();
-    let mut data = String::new();
-    file.read_to_string(&mut data).unwrap();
-    let reg = Regex::new(r"S:([\w\.]+?)=(.+?)\r?\n").unwrap();
-    reg.captures_iter(&data).map(|cap|
-        (cap.at(1).unwrap().to_owned(), cap.at(2).unwrap().to_owned())
-    ).collect()
-}
 trait Srgb {
     type Linear;
     fn decode(&self) -> <Self as Srgb>::Linear;
@@ -53,6 +40,18 @@ impl Srgb for Rgba<u8> {
         }
         let p = Rgba([dec(self[0]), dec(self[1]), dec(self[2]), dec(self[3])]);
         Rgba([p[0] * p[3], p[1] * p[3], p[2] * p[3], p[3]])
+    }
+}
+fn fix_translucent(img: &mut RgbaImage) {
+    for p in img.pixels_mut() {
+        if p[3] == 0 || p[3] == 255 { continue }
+        #[inline] fn unmult(x: u8, a: u8) -> u8 {
+            let n = (x as u16) * 255 / (a as u16);
+            if n > 255 { 255 } else { n as u8 }
+        }
+        p[0] = unmult(p[0], p[3]);
+        p[1] = unmult(p[1], p[3]);
+        p[2] = unmult(p[2], p[3]);
     }
 }
 fn decode_srgb(img: &RgbaImage) -> FloatImage {
@@ -118,24 +117,6 @@ fn resize(img: &FloatImage, width: u32, height: u32) -> FloatImage {
         })
     }
 }
-fn check_lang_dups() {
-    let lang = read_gt_lang();
-    let mut stuff = HashMap::new();
-    for (key, val) in lang.iter() {
-        if !key.contains(".name") { continue }
-        if key.contains(".tooltip") { continue }
-        if key.contains("gt.recipe") { continue }
-        if key.contains("DESCRIPTION") { continue }
-        match stuff.get(val) {
-            Some(other) => {
-                println!("Collision for {}", val);
-                println!("{} && {}", key, other);
-            },
-            None => (),
-        }
-        stuff.insert(val.clone(), key);
-    }
-}
 fn import_old_tilesheet(name: &str) {
     let path = Path::new(r"work/tilesheets/import.txt");
     if !path.is_file() { return }
@@ -178,59 +159,23 @@ fn deleted_ids() {
         writeln!(&mut out, "{}", ids).unwrap();
     }
 }
-fn fix_lang() {
-    let path = Path::new(r"work/GregTech.lang");
-    let mut file = File::open(&path).unwrap();
-    let mut data = String::new();
-    file.read_to_string(&mut data).unwrap();
-    let data = Regex::new("\r").unwrap().replace_all(&data, "");
-    let data = Regex::new("(blockores\\.[0-9]{1,3}\\.name=.*)").unwrap().replace_all(&data, "$1 (Stone)");
-    let data = Regex::new("(blockores\\.1[0-9]{3}\\.name=.*)").unwrap().replace_all(&data, "$1 (Netherrack)");
-    let data = Regex::new("(blockores\\.2[0-9]{3}\\.name=.*)").unwrap().replace_all(&data, "$1 (Endstone)");
-    let data = Regex::new("(blockores\\.3[0-9]{3}\\.name=.*)").unwrap().replace_all(&data, "$1 (Black Granite)");
-    let data = Regex::new("(blockores\\.4[0-9]{3}\\.name=.*)").unwrap().replace_all(&data, "$1 (Red Granite)");
-    let data = Regex::new("(blockores\\.16[0-9]{3}\\.name=.*)").unwrap().replace_all(&data, "$1 (Stone)");
-    let data = Regex::new("(blockores\\.17[0-9]{3}\\.name=.*)").unwrap().replace_all(&data, "$1 (Netherrack)");
-    let data = Regex::new("(blockores\\.18[0-9]{3}\\.name=.*)").unwrap().replace_all(&data, "$1 (Endstone)");
-    let data = Regex::new("(blockores\\.19[0-9]{3}\\.name=.*)").unwrap().replace_all(&data, "$1 (Black Granite)");
-    let data = Regex::new("(blockores\\.20[0-9]{3}\\.name=.*)").unwrap().replace_all(&data, "$1 (Red Granite)");
-    let data = Regex::new("(S:fluid\\..*=.*)").unwrap().replace_all(&data, "$1 (Fluid)");
-    drop(file);
-    let mut file = File::create(&path).unwrap();
-    write!(&mut file, "{}", data).unwrap();
-}
-
-fn dump_oredict() {
-    let lang = read_gt_lang();
-    let reg = Regex::new("^([0-9]+)x(.+)@([0-9]+)$").unwrap();
-    let fin = File::open(&Path::new(r"work/neiintegration_oredict.csv")).unwrap();
-    let fout = File::create(&Path::new(r"work/oredict.txt")).unwrap();
-    let fin = BufReader::new(fin);
-    let mut fout = BufWriter::new(fout);
-    for line in fin.lines() {
-        let line = line.unwrap();
-        let parts = line.trim().split(',').collect::<Vec<_>>();
-        assert!(parts.len() == 5);
-        let tag = parts[0];
-        let stack = parts[1];
-        let _id = parts[2];
-        let wildcard = parts[3];
-        let modname = parts[4];
-        if modname != "gregtech" { continue }
-        assert!(wildcard == "false");
-        let cap = reg.captures(stack).unwrap();
-        let quantity = cap.at(1).unwrap();
-        assert!(quantity == "1");
-        let item = cap.at(2).unwrap();
-        let meta = cap.at(3).unwrap();
-        let unlocal = format!("{}.{}.name", item, meta);
-        match lang.get(&unlocal) {
-            Some(thing) => writeln!(&mut fout, "{}!{}!GT!!", tag, &thing).unwrap(),
-            None => println!("Missing: {}", unlocal),
-        }
+fn shrink() {
+    let _ = create_dir("work/shrunk");
+    for entry in WalkDir::new("work/shrink") {
+        let entry = entry.unwrap();
+        let path = entry.path();
+        if !path.is_file() { continue }
+        let name = path.file_name().unwrap().to_str().unwrap();
+        println!("{:?}", name);
+        let mut img = image::open(path).unwrap().to_rgba();
+        fix_translucent(&mut img);
+        let img = decode_srgb(&img);
+        assert_eq!(img.dimensions(), (256, 256));
+        let img = resize(&img, 128, 128);
+        let img = encode_srgb(&img);
+        save(&img, format!("work/shrunk/Block {}", name).as_ref());
     }
 }
-
 fn main() {
     let args: Vec<_> = std::env::args().collect();
     let args: Vec<_> = args.iter().map(|x| &**x).collect();
@@ -238,11 +183,8 @@ fn main() {
         &["update", name] => tilesheets::update_tilesheet(name, &[16, 32], false),
         &["overwrite", name] => tilesheets::update_tilesheet(name, &[16, 32], true),
         &["import", name] => import_old_tilesheet(name),
-        &["fixlang"] => fix_lang(),
-        &["langdup"] => check_lang_dups(),
-        &["dumporedict"] => dump_oredict(),
-        &["oregen"] => oregen::oregen(),
         &["todelete"] => deleted_ids(),
+        &["shrink"] => shrink(),
         _ => println!("Invalid arguments"),
     }
 }

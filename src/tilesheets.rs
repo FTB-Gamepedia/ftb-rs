@@ -12,7 +12,7 @@ use std::process::{Command, Stdio};
 use std::mem::{swap};
 use std::path::{Path};
 use walkdir::{WalkDir};
-use {FloatImage, decode_srgb, encode_srgb, resize, save};
+use {FloatImage, decode_srgb, encode_srgb, resize, save, fix_translucent};
 
 struct Tilesheet {
     size: u32,
@@ -80,16 +80,7 @@ impl TilesheetManager {
             };
             if name.contains(&['_', '[', ']'][..]) { panic!("Illegal name: {:?}", name) }
             let mut img = image::open(&path).unwrap().to_rgba();
-            for p in img.pixels_mut() {
-                if p[3] == 0 || p[3] == 255 { continue }
-                #[inline] fn unmult(x: u8, a: u8) -> u8 {
-                    let n = (x as u16) * 255 / (a as u16);
-                    if n > 255 { 255 } else { n as u8 }
-                }
-                p[0] = unmult(p[0], p[3]);
-                p[1] = unmult(p[1], p[3]);
-                p[2] = unmult(p[2], p[3]);
-            }
+            fix_translucent(&mut img);
             let img = decode_srgb(&img);
             let (x, y, new) = self.lookup(&name);
             if new {
