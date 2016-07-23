@@ -1,6 +1,4 @@
-// Copyright © 2015, Peter Atashian
-
-#![feature(slice_patterns)]
+// Copyright © 2015-2016, Peter Atashian
 
 extern crate image;
 extern crate regex;
@@ -170,7 +168,8 @@ fn shrink() {
         let mut img = image::open(path).unwrap().to_rgba();
         fix_translucent(&mut img);
         let img = decode_srgb(&img);
-        assert_eq!(img.dimensions(), (768, 768));
+        assert_eq!(img.dimensions().0, img.dimensions().1, "Image was not square!");
+        assert!(img.dimensions().0 >= 384, "Image dimensions are too small!");
         let img = resize(&img, 192, 192);
         let img = encode_srgb(&img);
         save(&img, format!("work/shrunk/Block {}", name).as_ref());
@@ -179,12 +178,16 @@ fn shrink() {
 fn main() {
     let args: Vec<_> = std::env::args().collect();
     let args: Vec<_> = args.iter().map(|x| &**x).collect();
-    match &args[1..] {
-        &["update", name] => tilesheets::update_tilesheet(name, &[16, 32], false),
-        &["overwrite", name] => tilesheets::update_tilesheet(name, &[16, 32], true),
-        &["import", name] => import_old_tilesheet(name),
-        &["todelete"] => deleted_ids(),
-        &["shrink"] => shrink(),
-        _ => println!("Invalid arguments"),
+    if args.len() < 2 {
+        println!("Available commands: update, overwrite, import, shrink");
+        return
+    }
+    match args[1] {
+        "update" => tilesheets::update_tilesheet(args[2], &[16, 32], false),
+        "overwrite" => tilesheets::update_tilesheet(args[2], &[16, 32], true),
+        "import" => import_old_tilesheet(args[2]),
+        "todelete" => deleted_ids(),
+        "shrink" => shrink(),
+        _ => println!("Invalid command"),
     }
 }
