@@ -117,13 +117,6 @@ impl TilesheetManager {
         self.entries = entries;
     }
     fn save(&self) {
-        let _optipng = self.tilesheets.iter().map(|tilesheet| {
-            let name = format!("Tilesheet {} {}.png", self.name, tilesheet.size);
-            let path = Path::new(r"work/tilesheets").join(name);
-            save(&tilesheet.img, &path);
-            Command::new("optipng").arg(path).stdin(Stdio::null()).stdout(Stdio::null())
-                .stderr(Stdio::null()).spawn().unwrap()
-        }).collect::<Vec<_>>();
         let name = format!("Tilesheet {}.txt", self.name);
         let path = Path::new(r"work/tilesheets").join(name);
         let mut file = BufWriter::new(File::create(&path).unwrap());
@@ -134,7 +127,16 @@ impl TilesheetManager {
         for &(x, y, tile) in stuff.iter() {
             (writeln!(&mut file, "{} {} {}", x, y, tile)).unwrap();
         }
-        println!("Waiting for optipng to finish");
+        println!("Optimizing tilesheets");
+        let optipng = self.tilesheets.iter().map(|tilesheet| {
+            let name = format!("Tilesheet {} {}.png", self.name, tilesheet.size);
+            let path = Path::new(r"work/tilesheets").join(name);
+            save(&tilesheet.img, &path);
+            Command::new("optipng").arg(path).spawn().unwrap()
+        }).collect::<Vec<_>>();
+        for mut child in optipng {
+            child.wait().unwrap();
+        }
     }
     fn increment(&mut self) {
         self.next.1 += 1;
@@ -178,9 +180,9 @@ fn load_tiles(name: &str) -> HashMap<String, (u32, u32)> {
     let mut data = String::new();
     file.read_to_string(&mut data).unwrap();
     reg.captures_iter(&data).map(|cap| {
-        let x = cap.at(1).unwrap().parse().unwrap();
-        let y = cap.at(2).unwrap().parse().unwrap();
-        let name = cap.at(3).unwrap().to_owned();
+        let x = cap[1].parse().unwrap();
+        let y = cap[2].parse().unwrap();
+        let name = cap[3].to_owned();
         (name, (x, y))
     }).collect()
 }
@@ -210,7 +212,7 @@ fn load_renames(name: &str) -> HashMap<String, String> {
                 Some(cap) => cap,
                 None => panic!("Invalid line in renames.txt {:?}", line),
             };
-            (cap.at(1).unwrap().to_owned(), cap.at(2).unwrap().to_owned())
+            (cap[1].to_owned(), cap[2].to_owned())
         }).collect()
     } else {
         HashMap::new()
