@@ -1,4 +1,4 @@
-// Copyright © 2015-2016, Peter Atashian
+// Copyright © 2015-2017, Peter Atashian
 
 extern crate image;
 extern crate mediawiki;
@@ -9,11 +9,16 @@ extern crate walkdir;
 use image::{ImageBuffer, Rgba, RgbaImage};
 use image::ColorType::{RGBA};
 use regex::{Regex};
-use std::collections::{HashMap};
-use std::fs::{File, create_dir};
-use std::io::prelude::*;
-use std::io::{stdin, stdout};
-use std::path::{Path};
+use std::{
+    collections::HashMap,
+    env::args,
+    fs::{File, create_dir},
+    io::{
+        prelude::*,
+        stdin, stdout,
+    },
+    path::Path,
+};
 use walkdir::{WalkDir};
 
 mod tilesheets;
@@ -117,25 +122,6 @@ fn resize(img: &FloatImage, width: u32, height: u32) -> FloatImage {
         })
     }
 }
-fn import_old_tilesheet(name: &str) {
-    let path = Path::new(r"work/tilesheets/import.txt");
-    if !path.is_file() { return }
-    println!("Importing old tilesheet");
-    let mut file = File::open(&path).unwrap();
-    let mut data = String::new();
-    file.read_to_string(&mut data).unwrap();
-    let name = format!("work/tilesheets/Tilesheet {}.txt", name);
-    let path = Path::new(&name);
-    let mut out = File::create(&path).unwrap();
-    let reg = Regex::new(r"Edit\s+Translate\s+[0-9]+\s+(.+?)\s+[A-Z0-9-]+\s+([0-9]+)\s+([0-9]+)\s+16px, 32px").unwrap();
-    for line in data.lines() {
-        let cap = reg.captures(line).unwrap();
-        let name = &cap[1];
-        let x = &cap[2];
-        let y = &cap[3];
-        (writeln!(&mut out, "{} {} {}", x, y, name)).unwrap();
-    }
-}
 fn deleted_ids() {
     println!("Converting tile names to IDs");
     let mut file = File::open("work/tilesheets/import.txt").unwrap();
@@ -178,51 +164,31 @@ fn shrink() {
     }
 }
 fn main() {
-    let cout = stdout();
-    let mut cout = cout.lock();
-    let cin = stdin();
-    let mut cin = cin.lock();
-    writeln!(&mut cout, "Welcome to the FTB tilesheet program!").unwrap();
+    println!("Welcome to the FTB tilesheet program!");
     if !Path::new("ftb.json").is_file() {
-        writeln!(&mut cout, "Failed to locate ftb.json.").unwrap();
-        writeln!(&mut cout, "Please modify the template ftb.json that was created.").unwrap();
-        writeln!(&mut cout, "Make sure you use a bot account!").unwrap();
+        println!("Failed to locate ftb.json.");
+        println!("Please modify the template ftb.json that was created.");
+        println!("Make sure you use a bot account!");
         let mut file = File::create("ftb.json").unwrap();
         file.write_all(r#"{
     "useragent": "ftb-rs",
     "username": "insert username here",
     "password": "insert password here",
-    "baseapi": "http://ftb.gamepedia.com/api.php"
+    "baseapi": "https://ftb.gamepedia.com/api.php"
 }
-"#.as_bytes()).unwrap(); //"
+"#.as_bytes()).unwrap();
         return
     }
-    write!(&mut cout, "Mod abbreviation: ").unwrap();
-    cout.flush().unwrap();
-    let mut abbrv = String::new();
-    cin.read_line(&mut abbrv).unwrap();
-    let abbrv = abbrv.trim();
-    write!(&mut cout, "Would you like to delete existing tiles not included in your dump? [Y/N]: ").unwrap();
-    cout.flush().unwrap();
-    let mut response = String::new();
-    cin.read_line(&mut response).unwrap();
-    let response = response.trim();
-    let overwrite = match &*response.to_lowercase() {
-        "y" | "yes" => true,
-        "n" | "no" => false,
-        _ => {
-            writeln!(&mut cout, "Invalid response specified. Aborting.").unwrap();
-            return
+    let mut args = args();
+    args.next();
+    let abbrv = match args.next() {
+        Some(x) => x,
+        None => {
+            println!("Enter mod abbreviation:");
+            let mut abbrv = String::new();
+            stdin().read_line(&mut abbrv).unwrap();
+            abbrv.trim().to_owned()
         }
     };
-    tilesheets::update_tilesheet(abbrv, &[16, 32], overwrite);
-
-    // match args[1] {
-    //     "update" => tilesheets::update_tilesheet(args[2], &[16, 32], false),
-    //     "overwrite" => tilesheets::update_tilesheet(args[2], &[16, 32], true),
-    //     "import" => import_old_tilesheet(args[2]),
-    //     "todelete" => deleted_ids(),
-    //     "shrink" => shrink(),
-    //     _ => println!("Invalid command"),
-    // }
+    tilesheets::update_tilesheet(&abbrv);
 }

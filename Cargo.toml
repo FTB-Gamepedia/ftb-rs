@@ -4,10 +4,10 @@ name = "ftb"
 version = "0.0.1"
 
 [dependencies]
-regex = "0.2"
+regex = "1.0"
 rustc-serialize = "0.3"
-walkdir = "1.0"
-image = { default-features = false, features = ["png_codec"], version = "0.14" }
+walkdir = "2.0"
+image = { default-features = false, features = ["png_codec"], version = "0.19" }
 mediawiki = { git = "https://github.com/FTB-Gamepedia/mediawiki-rs" }
 
 [profile.release]

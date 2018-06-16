@@ -1,24 +1,34 @@
 // Copyright © 2015, Peter Atashian
 
 use image::{self, ImageBuffer, RgbaImage};
-use regex::{Regex};
-use std::borrow::{ToOwned};
-use std::cmp::{max};
-use std::collections::{HashMap, HashSet};
-use std::fs::{File};
-use std::io::prelude::*;
-use std::io::{BufWriter};
-use std::process::{Command, Stdio};
-use std::mem::{swap};
-use std::path::{Path};
+use mediawiki::{Mediawiki, tilesheet::Tilesheet};
+use regex::Regex;
+use std::{
+    borrow::ToOwned,
+    cmp::max,
+    collections::{HashMap, HashSet},
+    fs::File,
+    io::{prelude::*, BufWriter, stdin},
+    process::Command,
+    mem::swap,
+    path::Path,
+};
 use walkdir::{WalkDir};
 use {FloatImage, decode_srgb, encode_srgb, resize, save, fix_translucent};
 
-struct Tilesheet {
+struct Sheet {
     size: u32,
     img: RgbaImage,
 }
-impl Tilesheet {
+impl Sheet {
+    fn new(size: u32) -> Sheet {
+        let img = ImageBuffer::new(size, size);
+        Sheet { size: size, img: img }
+    }
+    fn load(data: &[u8], size: u32) -> Sheet {
+        let img = image::load_from_memory(data).unwrap();
+        Sheet { size: size, img: img.to_rgba() }
+    }
     fn grow(&mut self, w: u32, h: u32) {
         let mut img = ImageBuffer::new(w, h);
         for (x, y, &pix) in self.img.enumerate_pixels() {
@@ -43,25 +53,59 @@ impl Tilesheet {
     }
 }
 struct TilesheetManager {
+    mw: Mediawiki,
     name: String,
     lookup: HashMap<String, (u32, u32)>,
     entries: HashMap<(u32, u32), String>,
     renames: HashMap<String, String>,
-    tilesheets: Vec<Tilesheet>,
+    tilesheets: Vec<Sheet>,
     next: (u32, u32),
 }
 impl TilesheetManager {
-    fn new(name: &str, sizes: &[u32]) -> TilesheetManager {
-        let tilesheets = load_tilesheets(name, sizes);
-        let lookup = load_tiles(name);
-        let entries = load_entries(&lookup);
+    fn new(name: &str) -> TilesheetManager {
+        println!("Starting up tilesheet manager.");
         TilesheetManager {
+            mw: Mediawiki::login_path("ftb.json").unwrap(),
             name: name.to_owned(),
-            lookup: lookup,
-            entries: entries,
+            lookup: HashMap::new(),
+            entries: HashMap::new(),
             renames: load_renames(name),
-            tilesheets: tilesheets,
+            tilesheets: Vec::new(),
             next: (0, 0),
+        }
+    }
+    fn import_tilesheets(&mut self) {
+        println!("Checking for existing tilesheet.");
+        let sheet = self.mw.query_sheets().into_iter().find(|x| {
+            x.as_ref().ok().and_then(|x| x.get("mod")).and_then(|x| x.as_str()).map(|x| x == self.name).unwrap_or(false)
+        });
+        if let Some(Ok(sheet)) = sheet {
+            let sizes: Vec<u64> = sheet["sizes"].as_array().unwrap().iter().map(|x| x.as_u64().unwrap()).collect();
+            println!("Existing tilesheet sizes: {:?}", sizes);
+            println!("Importing existing tilesheet images.");
+            for size in sizes {
+                let data = self.mw.download_file(&format!("Tilesheet {} {}.png", self.name, size)).unwrap();
+                match data {
+                    Some(data) => self.tilesheets.push(Sheet::load(&data, size as u32)),
+                    None => {
+                        println!("WARNING: No tilesheet image found for size {}!", size);
+                        self.tilesheets.push(Sheet::new(size as u32));
+                    }
+                }
+            }
+        } else {
+            println!("No tilesheet found. Please specify desired sizes separated by commas:");
+            let mut sizes = String::new();
+            stdin().read_line(&mut sizes).unwrap();
+            for size in sizes.split(',').map(|x| x.trim().parse().unwrap()) {
+                self.tilesheets.push(Sheet::new(size));
+            }
+        }
+    }
+    fn import_tiles(&mut self) {
+        println!("Importing tiles.");
+        for tile in self.mw.query_tiles(Some(&*self.name)) {
+            println!("{:?}", tile);
         }
     }
     fn update(&mut self) {
@@ -189,18 +233,6 @@ fn load_tiles(name: &str) -> HashMap<String, (u32, u32)> {
 fn load_entries(tiles: &HashMap<String, (u32, u32)>) -> HashMap<(u32, u32), String> {
     tiles.iter().map(|(key, value)| (value.clone(), key.clone())).collect()
 }
-fn load_tilesheet(name: &str, size: u32) -> Tilesheet {
-    let name = format!("Tilesheet {} {}.png", name, size);
-    let path = Path::new(r"work/tilesheets").join(name);
-    let img = match image::open(&path) {
-        Ok(img) => img.to_rgba(),
-        Err(_) => ImageBuffer::new(size, size),
-    };
-    Tilesheet { size: size, img: img }
-}
-fn load_tilesheets(name: &str, sizes: &[u32]) -> Vec<Tilesheet> {
-    sizes.iter().map(|&size| load_tilesheet(name, size)).collect()
-}
 fn load_renames(name: &str) -> HashMap<String, String> {
     let path = Path::new(r"work/tilesheets").join(name);
     if let Ok(mut file) = File::open(&path.join("renames.txt")) {
@@ -218,15 +250,9 @@ fn load_renames(name: &str) -> HashMap<String, String> {
         HashMap::new()
     }
 }
-pub fn update_tilesheet(name: &str, sizes: &[u32], overwrite: bool) {
-    println!("Loading tilesheet");
-    let mut manager = TilesheetManager::new(name, sizes);
-    println!("Updating tilesheet");
-    if overwrite {
-        manager.clear_unused();
-    }
-    manager.update();
-    println!("Saving tilesheet");
-    manager.save();
+pub fn update_tilesheet(name: &str) {
+    let mut manager = TilesheetManager::new(name);
+    manager.import_tilesheets();
+    manager.import_tiles();
     println!("Done");
 }
