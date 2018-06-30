@@ -8,14 +8,12 @@ extern crate walkdir;
 
 use image::{ImageBuffer, Rgba, RgbaImage};
 use image::ColorType::{RGBA};
-use regex::{Regex};
 use std::{
-    collections::HashMap,
     env::args,
     fs::{File, create_dir},
     io::{
         prelude::*,
-        stdin, stdout,
+        stdin,
     },
     path::Path,
 };
@@ -120,29 +118,6 @@ fn resize(img: &FloatImage, width: u32, height: u32) -> FloatImage {
             let yy = (y as f32 * rh) as u32;
             img[(xx, yy)]
         })
-    }
-}
-fn deleted_ids() {
-    println!("Converting tile names to IDs");
-    let mut file = File::open("work/tilesheets/import.txt").unwrap();
-    let mut data = String::new();
-    file.read_to_string(&mut data).unwrap();
-    let reg = Regex::new(r"Edit\s+Translate\s+([0-9]+)\s+(.+?)\s+[A-Z0-9-]+\s+[0-9]+\s+[0-9]+\s+16px, 32px").unwrap();
-    let map: HashMap<_, _> = data.lines().map(|line| {
-        let cap = reg.captures(line).unwrap();
-        let id = cap[1].to_owned();
-        let name = cap[2].to_owned();
-        (name, id)
-    }).collect();
-    let mut file = File::open("work/tilesheets/Deleted.txt").unwrap();
-    let mut data = String::new();
-    file.read_to_string(&mut data).unwrap();
-    let mut out = File::create("work/tilesheets/IDs.txt").unwrap();
-    let mut ids: Vec<_> = data.lines().map(|name| &*map[name]).collect();
-    ids.sort();
-    for chunk in ids.chunks(40) {
-        let ids = chunk.join("|");
-        writeln!(&mut out, "{}", ids).unwrap();
     }
 }
 fn shrink() {
