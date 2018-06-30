@@ -109,10 +109,12 @@ impl TilesheetManager {
             println!("No tilesheet found. Please specify desired sizes separated by commas:");
             let mut sizes = String::new();
             stdin().read_line(&mut sizes).unwrap();
-            for size in sizes.split(',').map(|x| x.trim().parse().unwrap()) {
-                self.tilesheets.push(Sheet::new(size));
+            let sizes = sizes.split(',').map(|x| x.trim()).collect::<Vec<_>>();
+            for size in &sizes {
+                self.tilesheets.push(Sheet::new(size.parse().unwrap()));
             }
-            // TODO createsheet
+            let token = self.mw.get_token().unwrap();
+            self.mw.create_sheet(&token, &self.name, &sizes.join("|")).unwrap();
         }
     }
     fn import_tiles(&mut self) {
