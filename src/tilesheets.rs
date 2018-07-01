@@ -272,7 +272,7 @@ impl TilesheetManager {
     }
     fn upload_sheets(&self) {
         println!("Tilesheet uploading does not work currently.");
-        println!("Please manually uploaded the tilesheet images.");
+        println!("Please manually upload the tilesheet images.");
     }
     fn delete_tiles(&self) {
         println!("Deleting old tiles that are no longer needed.");
