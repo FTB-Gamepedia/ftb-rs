@@ -1,20 +1,18 @@
-// Copyright © 2015, Peter Atashian
-
+use crate::{decode_srgb, encode_srgb, fix_translucent, resize, save, FloatImage};
 use image::{self, ImageBuffer, RgbaImage};
-use mediawiki::{Mediawiki, tilesheet::Tilesheet};
+use mediawiki::{tilesheet::Tilesheet, Mediawiki};
 use regex::Regex;
 use std::{
     borrow::ToOwned,
     cmp::max,
     collections::{HashMap, HashSet},
     fs::File,
-    io::{BufRead, BufReader, BufWriter, Read, Write, stdin},
-    process::{Command, exit},
+    io::{stdin, BufRead, BufReader, BufWriter, Read, Write},
     mem::swap,
     path::Path,
+    process::{exit, Command},
 };
-use walkdir::{WalkDir};
-use {FloatImage, decode_srgb, encode_srgb, resize, save, fix_translucent};
+use walkdir::WalkDir;
 
 struct Sheet {
     size: u32,
@@ -23,11 +21,17 @@ struct Sheet {
 impl Sheet {
     fn new(size: u32) -> Sheet {
         let img = ImageBuffer::new(size, size);
-        Sheet { size: size, img: img }
+        Sheet {
+            size: size,
+            img: img,
+        }
     }
     fn load(data: &[u8], size: u32) -> Sheet {
         let img = image::load_from_memory(data).unwrap();
-        Sheet { size: size, img: img.to_rgba() }
+        Sheet {
+            size: size,
+            img: img.to_rgba(),
+        }
     }
     fn grow(&mut self, w: u32, h: u32) {
         let mut img = ImageBuffer::new(w, h);
@@ -89,14 +93,27 @@ impl TilesheetManager {
     fn import_tilesheets(&mut self) {
         println!("Checking for existing tilesheet.");
         let sheet = self.mw.query_sheets().into_iter().find(|x| {
-            x.as_ref().ok().and_then(|x| x.get("mod")).and_then(|x| x.as_str()).map(|x| x == self.name).unwrap_or(false)
+            x.as_ref()
+                .ok()
+                .and_then(|x| x.get("mod"))
+                .and_then(|x| x.as_str())
+                .map(|x| x == self.name)
+                .unwrap_or(false)
         });
         if let Some(Ok(sheet)) = sheet {
-            let sizes: Vec<u64> = sheet["sizes"].as_array().unwrap().iter().map(|x| x.as_u64().unwrap()).collect();
+            let sizes: Vec<u64> = sheet["sizes"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|x| x.as_u64().unwrap())
+                .collect();
             println!("Existing tilesheet sizes: {:?}", sizes);
             println!("Importing existing tilesheet images.");
             for size in sizes {
-                let data = self.mw.download_file(&format!("Tilesheet {} {}.png", self.name, size)).unwrap();
+                let data = self
+                    .mw
+                    .download_file(&format!("Tilesheet {} {}.png", self.name, size))
+                    .unwrap();
                 match data {
                     Some(data) => self.tilesheets.push(Sheet::load(&data, size as u32)),
                     None => {
@@ -114,7 +131,9 @@ impl TilesheetManager {
                 self.tilesheets.push(Sheet::new(size.parse().unwrap()));
             }
             let token = self.mw.get_token().unwrap();
-            self.mw.create_sheet(&token, &self.name, &sizes.join("|")).unwrap();
+            self.mw
+                .create_sheet(&token, &self.name, &sizes.join("|"))
+                .unwrap();
         }
     }
     fn import_tiles(&mut self) {
@@ -124,14 +143,21 @@ impl TilesheetManager {
                 Ok(tile) => tile,
                 Err(e) => {
                     println!("WARNING: Error while querying tiles {:?}", e);
-                    continue
-                },
+                    continue;
+                }
             };
             let x = tile["x"].as_u64().unwrap() as u32;
             let y = tile["y"].as_u64().unwrap() as u32;
             let id = tile["id"].as_u64().unwrap();
             let name = tile["name"].as_str().unwrap();
-            self.tiles.insert(name.to_owned(), Tile { x: x, y: y, id: Some(id) });
+            self.tiles.insert(
+                name.to_owned(),
+                Tile {
+                    x: x,
+                    y: y,
+                    id: Some(id),
+                },
+            );
             self.entries.insert((x, y), name.to_owned());
             self.missing.insert(name.to_owned());
         }
@@ -142,16 +168,20 @@ impl TilesheetManager {
         for entry in WalkDir::new(&path) {
             let entry = entry.unwrap();
             let path = entry.path();
-            if !path.is_file() { continue }
-            if path.extension().and_then(|x| x.to_str()) != Some("png") { continue }
+            if !path.is_file() {
+                continue;
+            }
+            if path.extension().and_then(|x| x.to_str()) != Some("png") {
+                continue;
+            }
             let name = path.file_stem().unwrap().to_str().unwrap();
             let name = match self.renames.get(name) {
                 Some(name) => {
                     if name.is_empty() {
-                        continue
+                        continue;
                     }
                     name.clone()
-                },
+                }
                 None => name.to_owned(),
             };
             if name.contains(&['_', '[', ']'][..]) {
@@ -196,10 +226,13 @@ impl TilesheetManager {
                 Some(tile) => {
                     self.deleted.push(tile.id.unwrap());
                     self.entries.remove(&(tile.x, tile.y));
-                },
+                }
                 None => {
-                    println!("ERROR: Requested to delete tile that doesn't exist {:?}", name);
-                },
+                    println!(
+                        "ERROR: Requested to delete tile that doesn't exist {:?}",
+                        name
+                    );
+                }
             };
         }
     }
@@ -215,7 +248,7 @@ impl TilesheetManager {
                 (self.next.0, self.next.1 - self.next.0)
             };
             if self.entries.get(&pos).is_none() {
-                break pos
+                break pos;
             }
             self.next.1 += 1;
             if self.next.1 > self.next.0 * 2 {
@@ -223,7 +256,14 @@ impl TilesheetManager {
                 self.next.1 = 0;
             }
         };
-        self.tiles.insert(name.to_owned(), Tile { x: pos.0, y: pos.1, id: None });
+        self.tiles.insert(
+            name.to_owned(),
+            Tile {
+                x: pos.0,
+                y: pos.1,
+                id: None,
+            },
+        );
         self.entries.insert(pos, name.to_owned());
         (pos.0, pos.1)
     }
@@ -233,16 +273,20 @@ impl TilesheetManager {
         for entry in WalkDir::new(&path) {
             let entry = entry.unwrap();
             let path = entry.path();
-            if !path.is_file() { continue }
-            if path.extension().and_then(|x| x.to_str()) != Some("png") { continue }
+            if !path.is_file() {
+                continue;
+            }
+            if path.extension().and_then(|x| x.to_str()) != Some("png") {
+                continue;
+            }
             let name = path.file_stem().unwrap().to_str().unwrap();
             let name = match self.renames.get(name) {
                 Some(name) => {
                     if name.is_empty() {
-                        continue
+                        continue;
                     }
                     name.clone()
-                },
+                }
                 None => name.to_owned(),
             };
             if name.contains(&['_', '[', ']'][..]) {
@@ -260,12 +304,16 @@ impl TilesheetManager {
     }
     fn optimize(&self) {
         println!("Optimizing tilesheets");
-        let optipng = self.tilesheets.iter().map(|tilesheet| {
-            let name = format!("Tilesheet {} {}.png", self.name, tilesheet.size);
-            let path = Path::new(r"work/tilesheets").join(name);
-            save(&tilesheet.img, &path);
-            Command::new("optipng").arg(path).spawn().unwrap()
-        }).collect::<Vec<_>>();
+        let optipng = self
+            .tilesheets
+            .iter()
+            .map(|tilesheet| {
+                let name = format!("Tilesheet {} {}.png", self.name, tilesheet.size);
+                let path = Path::new(r"work/tilesheets").join(name);
+                save(&tilesheet.img, &path);
+                Command::new("optipng").arg(path).spawn().unwrap()
+            })
+            .collect::<Vec<_>>();
         for mut child in optipng {
             child.wait().unwrap();
         }
@@ -278,7 +326,11 @@ impl TilesheetManager {
         println!("Deleting old tiles that are no longer needed.");
         let token = self.mw.get_token().unwrap();
         for chunk in self.deleted.chunks(50) {
-            let tiles = chunk.iter().map(|id| id.to_string()).collect::<Vec<_>>().join("|");
+            let tiles = chunk
+                .iter()
+                .map(|id| id.to_string())
+                .collect::<Vec<_>>()
+                .join("|");
             if let Err(e) = self.mw.delete_tiles(&token, &tiles) {
                 println!("ERROR: {:?}", e);
             }
@@ -288,10 +340,14 @@ impl TilesheetManager {
         println!("Adding new tiles.");
         let token = self.mw.get_token().unwrap();
         for chunk in self.added.chunks(50) {
-            let tiles = chunk.iter().map(|name| {
-                let tile = &self.tiles[name];
-                format!("{} {} {}", tile.x, tile.y, name)
-            }).collect::<Vec<_>>().join("|");
+            let tiles = chunk
+                .iter()
+                .map(|name| {
+                    let tile = &self.tiles[name];
+                    format!("{} {} {}", tile.x, tile.y, name)
+                })
+                .collect::<Vec<_>>()
+                .join("|");
             if let Err(e) = self.mw.add_tiles(&token, &self.name, &tiles) {
                 println!("ERROR: {:?}", e);
             }
@@ -305,20 +361,20 @@ fn load_renames(name: &str) -> HashMap<String, String> {
             let reg = Regex::new("(.*)=(.*)").unwrap();
             let mut s = String::new();
             file.read_to_string(&mut s).unwrap();
-            s.lines().filter_map(|line| {
-                match reg.captures(line) {
+            s.lines()
+                .filter_map(|line| match reg.captures(line) {
                     Some(cap) => Some((cap[1].to_owned(), cap[2].to_owned())),
                     None => {
                         println!("WARNING: Invalid line in renames.txt {:?}", line);
                         None
-                    },
-                }
-            }).collect()
-        },
+                    }
+                })
+                .collect()
+        }
         Err(e) => {
             println!("WARNING: Failed to load renames.txt {:?}", e);
             HashMap::new()
-        },
+        }
     }
 }
 pub fn update_tilesheet(name: &str) {

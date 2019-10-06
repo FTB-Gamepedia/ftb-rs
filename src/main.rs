@@ -1,23 +1,12 @@
-// Copyright © 2015-2017, Peter Atashian
-
-extern crate image;
-extern crate mediawiki;
-extern crate regex;
-extern crate rustc_serialize;
-extern crate walkdir;
-
+use image::ColorType::RGBA;
 use image::{ImageBuffer, Rgba, RgbaImage};
-use image::ColorType::{RGBA};
 use std::{
     env::args,
-    fs::{File, create_dir},
-    io::{
-        prelude::*,
-        stdin,
-    },
+    fs::{create_dir, File},
+    io::{stdin, Write},
     path::Path,
 };
-use walkdir::{WalkDir};
+use walkdir::WalkDir;
 
 mod tilesheets;
 
@@ -47,10 +36,17 @@ impl Srgb for Rgba<u8> {
 }
 fn fix_translucent(img: &mut RgbaImage) {
     for p in img.pixels_mut() {
-        if p[3] == 0 || p[3] == 255 { continue }
-        #[inline] fn unmult(x: u8, a: u8) -> u8 {
+        if p[3] == 0 || p[3] == 255 {
+            continue;
+        }
+        #[inline]
+        fn unmult(x: u8, a: u8) -> u8 {
             let n = (x as u16) * 255 / (a as u16);
-            if n > 255 { 255 } else { n as u8 }
+            if n > 255 {
+                255
+            } else {
+                n as u8
+            }
         }
         p[0] = unmult(p[0], p[3]);
         p[1] = unmult(p[1], p[3]);
@@ -77,7 +73,12 @@ impl Linear for Rgba<f32> {
             (x * 255.).round().max(0.).min(255.) as u8
         }
         let p = if self[3] > 0.0001 {
-            Rgba([self[0] / self[3], self[1] / self[3], self[2] / self[3], self[3]])
+            Rgba([
+                self[0] / self[3],
+                self[1] / self[3],
+                self[2] / self[3],
+                self[3],
+            ])
         } else {
             Rgba([0., 0., 0., 0.])
         };
@@ -120,18 +121,25 @@ fn resize(img: &FloatImage, width: u32, height: u32) -> FloatImage {
         })
     }
 }
+#[allow(dead_code)]
 fn shrink() {
     let _ = create_dir("work/shrunk");
     for entry in WalkDir::new("work/shrink") {
         let entry = entry.unwrap();
         let path = entry.path();
-        if !path.is_file() { continue }
+        if !path.is_file() {
+            continue;
+        }
         let name = path.file_name().unwrap().to_str().unwrap();
         println!("{:?}", name);
         let mut img = image::open(path).unwrap().to_rgba();
         fix_translucent(&mut img);
         let img = decode_srgb(&img);
-        assert_eq!(img.dimensions().0, img.dimensions().1, "Image was not square!");
+        assert_eq!(
+            img.dimensions().0,
+            img.dimensions().1,
+            "Image was not square!"
+        );
         assert!(img.dimensions().0 >= 384, "Image dimensions are too small!");
         let img = resize(&img, 192, 192);
         let img = encode_srgb(&img);
@@ -145,14 +153,18 @@ fn main() {
         println!("Please modify the template ftb.json that was created.");
         println!("Make sure you use a bot account!");
         let mut file = File::create("ftb.json").unwrap();
-        file.write_all(r#"{
+        file.write_all(
+            r#"{
     "useragent": "ftb-rs",
     "username": "insert username here",
     "password": "insert password here",
     "baseapi": "https://ftb.gamepedia.com/api.php"
 }
-"#.as_bytes()).unwrap();
-        return
+"#
+            .as_bytes(),
+        )
+        .unwrap();
+        return;
     }
     let mut args = args();
     args.next();

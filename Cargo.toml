@@ -2,10 +2,10 @@
 authors = ["Peter Atashian <retep998@gmail.com>"]
 name = "ftb"
 version = "0.0.1"
+edition = "2018"
 
 [dependencies]
 regex = "1.0"
-rustc-serialize = "0.3"
 walkdir = "2.0"
 image = { default-features = false, features = ["png_codec"], version = "0.19" }
 mediawiki = { git = "https://github.com/FTB-Gamepedia/mediawiki-rs" }
