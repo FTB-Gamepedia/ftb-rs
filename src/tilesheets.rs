@@ -21,15 +21,12 @@ struct Sheet {
 impl Sheet {
     fn new(size: u32) -> Sheet {
         let img = ImageBuffer::new(size, size);
-        Sheet {
-            size: size,
-            img: img,
-        }
+        Sheet { size, img }
     }
     fn load(data: &[u8], size: u32) -> Sheet {
         let img = image::load_from_memory(data).unwrap();
         Sheet {
-            size: size,
+            size,
             img: img.to_rgba(),
         }
     }
@@ -97,8 +94,7 @@ impl TilesheetManager {
                 .ok()
                 .and_then(|x| x.get("mod"))
                 .and_then(|x| x.as_str())
-                .map(|x| x == self.name)
-                .unwrap_or(false)
+                .map_or(false, |x| x == self.name)
         });
         if let Some(Ok(sheet)) = sheet {
             let sizes: Vec<u64> = sheet["sizes"]
@@ -110,23 +106,22 @@ impl TilesheetManager {
             println!("Existing tilesheet sizes: {:?}", sizes);
             println!("Importing existing tilesheet images.");
             for size in sizes {
-                let data = self
+                if let Some(data) = self
                     .mw
                     .download_file(&format!("Tilesheet {} {}.png", self.name, size))
-                    .unwrap();
-                match data {
-                    Some(data) => self.tilesheets.push(Sheet::load(&data, size as u32)),
-                    None => {
-                        println!("WARNING: No tilesheet image found for size {}!", size);
-                        self.tilesheets.push(Sheet::new(size as u32));
-                    }
+                    .unwrap()
+                {
+                    self.tilesheets.push(Sheet::load(&data, size as u32))
+                } else {
+                    println!("WARNING: No tilesheet image found for size {}!", size);
+                    self.tilesheets.push(Sheet::new(size as u32));
                 }
             }
         } else {
             println!("No tilesheet found. Please specify desired sizes separated by commas:");
             let mut sizes = String::new();
             stdin().read_line(&mut sizes).unwrap();
-            let sizes = sizes.split(',').map(|x| x.trim()).collect::<Vec<_>>();
+            let sizes = sizes.split(',').map(str::trim).collect::<Vec<_>>();
             for size in &sizes {
                 self.tilesheets.push(Sheet::new(size.parse().unwrap()));
             }
@@ -150,14 +145,8 @@ impl TilesheetManager {
             let y = tile["y"].as_u64().unwrap() as u32;
             let id = tile["id"].as_u64().unwrap();
             let name = tile["name"].as_str().unwrap();
-            self.tiles.insert(
-                name.to_owned(),
-                Tile {
-                    x: x,
-                    y: y,
-                    id: Some(id),
-                },
-            );
+            self.tiles
+                .insert(name.to_owned(), Tile { x, y, id: Some(id) });
             self.entries.insert((x, y), name.to_owned());
             self.missing.insert(name.to_owned());
         }
@@ -222,24 +211,20 @@ impl TilesheetManager {
         let todelete = BufReader::new(File::open(r"work/tilesheets/todelete.txt").unwrap());
         for line in todelete.lines() {
             let name = line.unwrap();
-            match self.tiles.remove(&name) {
-                Some(tile) => {
-                    self.deleted.push(tile.id.unwrap());
-                    self.entries.remove(&(tile.x, tile.y));
-                }
-                None => {
-                    println!(
-                        "ERROR: Requested to delete tile that doesn't exist {:?}",
-                        name
-                    );
-                }
-            };
+            if let Some(tile) = self.tiles.remove(&name) {
+                self.deleted.push(tile.id.unwrap());
+                self.entries.remove(&(tile.x, tile.y));
+            } else {
+                println!(
+                    "ERROR: Requested to delete tile that doesn't exist {:?}",
+                    name
+                );
+            }
         }
     }
     fn lookup(&mut self, name: &str) -> (u32, u32) {
-        match self.tiles.get(name) {
-            Some(ref tile) => return (tile.x, tile.y),
-            None => (),
+        if let Some(tile) = self.tiles.get(name) {
+            return (tile.x, tile.y);
         }
         let pos = loop {
             let pos = if self.next.1 < self.next.0 {
@@ -297,7 +282,7 @@ impl TilesheetManager {
             fix_translucent(&mut img);
             let img = decode_srgb(&img);
             let (x, y) = self.lookup(&name);
-            for tilesheet in self.tilesheets.iter_mut() {
+            for tilesheet in &mut self.tilesheets {
                 tilesheet.insert(x, y, &img);
             }
         }

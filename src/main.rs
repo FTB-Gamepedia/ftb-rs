@@ -1,6 +1,10 @@
+#![warn(clippy::all)]
+#![allow(clippy::many_single_char_names)]
+
 use image::ColorType::RGBA;
 use image::{ImageBuffer, Rgba, RgbaImage};
 use std::{
+    cmp::Ordering,
     env::args,
     fs::{create_dir, File},
     io::{stdin, Write},
@@ -36,9 +40,6 @@ impl Srgb for Rgba<u8> {
 }
 fn fix_translucent(img: &mut RgbaImage) {
     for p in img.pixels_mut() {
-        if p[3] == 0 || p[3] == 255 {
-            continue;
-        }
         #[inline]
         fn unmult(x: u8, a: u8) -> u8 {
             let n = (x as u16) * 255 / (a as u16);
@@ -47,6 +48,9 @@ fn fix_translucent(img: &mut RgbaImage) {
             } else {
                 n as u8
             }
+        }
+        if p[3] == 0 || p[3] == 255 {
+            continue;
         }
         p[0] = unmult(p[0], p[3]);
         p[1] = unmult(p[1], p[3]);
@@ -92,33 +96,35 @@ fn encode_srgb(img: &FloatImage) -> RgbaImage {
 fn resize(img: &FloatImage, width: u32, height: u32) -> FloatImage {
     let (w, h) = img.dimensions();
     assert!(width.cmp(&w) == height.cmp(&h));
-    if width < w {
-        let (rw, rh) = (w as f32 / (width as f32), h as f32 / (height as f32));
-        ImageBuffer::from_fn(width, height, |x: u32, y: u32| {
-            let (x1, x2) = ((x as f32 * rw) as u32, ((x + 1) as f32 * rw) as u32);
-            let (y1, y2) = ((y as f32 * rh) as u32, ((y + 1) as f32 * rh) as u32);
-            let (mut r, mut g, mut b, mut a) = (0., 0., 0., 0.);
-            for xx in x1..x2 {
-                for yy in y1..y2 {
-                    let p = img[(xx, yy)];
-                    r += p[0];
-                    g += p[1];
-                    b += p[2];
-                    a += p[3];
+    match width.cmp(&w) {
+        Ordering::Less => {
+            let (rw, rh) = (w as f32 / (width as f32), h as f32 / (height as f32));
+            ImageBuffer::from_fn(width, height, |x: u32, y: u32| {
+                let (x1, x2) = ((x as f32 * rw) as u32, ((x + 1) as f32 * rw) as u32);
+                let (y1, y2) = ((y as f32 * rh) as u32, ((y + 1) as f32 * rh) as u32);
+                let (mut r, mut g, mut b, mut a) = (0., 0., 0., 0.);
+                for xx in x1..x2 {
+                    for yy in y1..y2 {
+                        let p = img[(xx, yy)];
+                        r += p[0];
+                        g += p[1];
+                        b += p[2];
+                        a += p[3];
+                    }
                 }
-            }
-            let m = 1. / (((x2 - x1) * (y2 - y1)) as f32);
-            Rgba([r * m, g * m, b * m, a * m])
-        })
-    } else if width == w {
-        img.clone()
-    } else {
-        let (rw, rh) = (w as f32 / (width as f32), h as f32 / (height as f32));
-        ImageBuffer::from_fn(width, height, |x: u32, y: u32| {
-            let xx = (x as f32 * rw) as u32;
-            let yy = (y as f32 * rh) as u32;
-            img[(xx, yy)]
-        })
+                let m = 1. / (((x2 - x1) * (y2 - y1)) as f32);
+                Rgba([r * m, g * m, b * m, a * m])
+            })
+        }
+        Ordering::Equal => img.clone(),
+        Ordering::Greater => {
+            let (rw, rh) = (w as f32 / (width as f32), h as f32 / (height as f32));
+            ImageBuffer::from_fn(width, height, |x: u32, y: u32| {
+                let xx = (x as f32 * rw) as u32;
+                let yy = (y as f32 * rh) as u32;
+                img[(xx, yy)]
+            })
+        }
     }
 }
 #[allow(dead_code)]
