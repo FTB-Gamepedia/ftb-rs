@@ -108,7 +108,7 @@ impl TilesheetManager {
             for size in sizes {
                 if let Some(data) = self
                     .mw
-                    .download_file(&format!("Tilesheet {} {}.png", self.name, size))
+                    .download_file(&format!("Tilesheet {} {} 0.png", self.name, size))
                     .unwrap()
                 {
                     self.tilesheets.push(Sheet::load(&data, size as u32))
@@ -293,7 +293,7 @@ impl TilesheetManager {
             .tilesheets
             .iter()
             .map(|tilesheet| {
-                let name = format!("Tilesheet {} {}.png", self.name, tilesheet.size);
+                let name = format!("Tilesheet {} {} 0.png", self.name, tilesheet.size);
                 let path = Path::new(r"work/tilesheets").join(name);
                 save(&tilesheet.img, &path);
                 Command::new("optipng").arg(path).spawn().unwrap()
