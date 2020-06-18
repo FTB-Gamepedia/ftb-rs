@@ -1,7 +1,6 @@
 #![warn(clippy::all)]
 #![allow(clippy::many_single_char_names)]
 
-use image::ColorType::RGBA;
 use image::{ImageBuffer, Rgba, RgbaImage};
 use std::{
     cmp::Ordering,
@@ -15,9 +14,6 @@ use walkdir::WalkDir;
 mod tilesheets;
 
 type FloatImage = ImageBuffer<Rgba<f32>, Vec<f32>>;
-fn save(img: &RgbaImage, path: &Path) {
-    image::save_buffer(path, img, img.width(), img.height(), RGBA(8)).unwrap();
-}
 
 trait Srgb {
     type Linear;
@@ -149,7 +145,7 @@ fn shrink() {
         assert!(img.dimensions().0 >= 384, "Image dimensions are too small!");
         let img = resize(&img, 192, 192);
         let img = encode_srgb(&img);
-        save(&img, format!("work/shrunk/Block {}", name).as_ref());
+        img.save(format!("work/shrunk/Block {}", name)).unwrap();
     }
 }
 fn main() {
@@ -162,8 +158,8 @@ fn main() {
         file.write_all(
             r#"{
     "useragent": "ftb-rs",
-    "username": "insert username here",
-    "password": "insert password here",
+    "username": "insert bot username here",
+    "password": "insert bot password here",
     "baseapi": "https://ftb.gamepedia.com/api.php"
 }
 "#

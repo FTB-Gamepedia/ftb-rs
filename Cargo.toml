@@ -5,9 +5,10 @@ version = "0.0.1"
 edition = "2018"
 
 [dependencies]
-regex = "1.0"
-walkdir = "2.0"
-image = { default-features = false, features = ["png_codec"], version = "0.19" }
+regex = "1.4"
+walkdir = "2.3"
+image = { default-features = false, features = ["png"], version = "0.23" }
+lazy_static = "1.4"
 mediawiki = { git = "https://github.com/FTB-Gamepedia/mediawiki-rs" }
 
 [profile.release]
