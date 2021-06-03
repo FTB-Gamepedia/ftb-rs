@@ -134,7 +134,7 @@ fn shrink() {
         }
         let name = path.file_name().unwrap().to_str().unwrap();
         println!("{:?}", name);
-        let mut img = image::open(path).unwrap().to_rgba();
+        let mut img = image::open(path).unwrap().to_rgba8();
         fix_translucent(&mut img);
         let img = decode_srgb(&img);
         assert_eq!(

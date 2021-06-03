@@ -32,7 +32,7 @@ impl Sheet {
     }
     fn load_layer(&mut self, data: &[u8]) {
         let layer = image::load_from_memory(data).unwrap();
-        self.layers.push(layer.to_rgba());
+        self.layers.push(layer.to_rgba8());
     }
     fn add_layer(&mut self) {
         let layer = ImageBuffer::new(self.size, self.size);
@@ -310,7 +310,7 @@ impl TilesheetManager {
                 println!("ERROR: Illegal name: {:?}", name);
                 exit(1);
             }
-            let mut img = image::open(&path).unwrap().to_rgba();
+            let mut img = image::open(&path).unwrap().to_rgba8();
             fix_translucent(&mut img);
             let img = decode_srgb(&img);
             let pos = self.lookup(&name);
@@ -419,7 +419,10 @@ impl TilesheetManager {
                 .map(|id| id.to_string())
                 .collect::<Vec<_>>()
                 .join("|");
-            if let Err(e) = self.mw.delete_tiles(&token, &tiles) {
+            if let Err(e) = self
+                .mw
+                .delete_tiles(&token, &tiles, Some("ftb-rs deleting tiles"))
+            {
                 println!("ERROR: {:?}", e);
             }
         }
@@ -436,7 +439,10 @@ impl TilesheetManager {
                 })
                 .collect::<Vec<_>>()
                 .join("|");
-            if let Err(e) = self.mw.add_tiles(&token, &self.name, &tiles) {
+            if let Err(e) =
+                self.mw
+                    .add_tiles(&token, &self.name, &tiles, Some("ftb-rs adding tiles"))
+            {
                 println!("ERROR: {:?}", e);
             }
         }
