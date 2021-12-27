@@ -358,7 +358,10 @@ impl TilesheetManager {
                             false,
                         )
                         .unwrap();
-                    match result["upload"]["result"].as_str().unwrap() {
+                    match result["upload"]["result"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("could not find upload result: {:?}", result))
+                    {
                         "Warning" => {
                             let warnings = result["upload"]["warnings"]
                                 .as_object()

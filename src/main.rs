@@ -160,7 +160,7 @@ fn main() {
     "useragent": "ftb-rs",
     "username": "insert bot username here",
     "password": "insert bot password here",
-    "baseapi": "https://ftb.gamepedia.com/api.php"
+    "baseapi": "https://ftb.fandom.com/api.php"
 }
 "#
             .as_bytes(),

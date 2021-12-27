@@ -1,6 +1,6 @@
 # ftb-rs
 
-Used to update tilesheets on the FTB Gamepedia Wiki, and maybe do other things too.
+Used to update tilesheets on the FTB Fandom Wiki (formerly the FTB Gamepedia Wiki), and maybe do other things too.
 
 ## Folder Structure
 
