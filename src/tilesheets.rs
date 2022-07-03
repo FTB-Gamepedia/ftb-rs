@@ -468,8 +468,8 @@ fn load_renames(name: &str) -> HashMap<String, String> {
                 })
                 .collect()
         }
-        Err(e) => {
-            println!("WARNING: Failed to load renames.txt {:?}", e);
+        Err(_) => {
+            println!("WARNING: Failed to load renames.txt");
             HashMap::new()
         }
     }
