@@ -16,5 +16,10 @@ jobs:
         profile: minimal
     - name: Build
       run: cargo build
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: ftb-rs-${{ matrix.os }}
+        path: target/debug/ftb-rs
     - name: Run tests
       run: cargo test
