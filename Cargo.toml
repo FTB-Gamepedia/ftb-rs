@@ -10,6 +10,7 @@ walkdir = "2.3"
 image = { default-features = false, features = ["png"], version = "0.23" }
 lazy_static = "1.4"
 mediawiki = { git = "https://github.com/FTB-Gamepedia/mediawiki-rs" }
+oxipng = "8.0.0"
 
 [profile.release]
 debug = true

@@ -10,7 +10,8 @@ use std::{
     fs::File,
     io::{stdin, BufRead, BufReader, BufWriter, Read, Write},
     path::PathBuf,
-    process::{exit, Command},
+    process::exit,
+    thread::spawn,
 };
 use walkdir::WalkDir;
 
@@ -122,7 +123,7 @@ impl TilesheetManager {
                 .iter()
                 .map(|x| x.as_u64().unwrap())
                 .collect();
-            println!("Existing tilesheet sizes: {:?}", sizes);
+            println!("Existing tilesheet sizes: {sizes:?}");
             println!("Importing existing tilesheet images.");
             for size in sizes {
                 let mut sheet = Sheet::new(size as u32);
@@ -135,7 +136,7 @@ impl TilesheetManager {
                         sheet.load_layer(&data);
                     } else {
                         if z == 0 {
-                            println!("WARNING: No tilesheet image found for size {}!", size);
+                            println!("WARNING: No tilesheet image found for size {size}!");
                         }
                         break;
                     }
@@ -162,7 +163,7 @@ impl TilesheetManager {
             let tile = match tile {
                 Ok(tile) => tile,
                 Err(e) => {
-                    println!("WARNING: Error while querying tiles {:?}", e);
+                    println!("WARNING: Error while querying tiles {e:?}");
                     continue;
                 }
             };
@@ -201,7 +202,7 @@ impl TilesheetManager {
                 None => name.to_owned(),
             };
             if name.contains(&['_', '[', ']'][..]) {
-                println!("ERROR: Illegal name: {:?}", name);
+                println!("ERROR: Illegal name: {name:?}");
                 exit(1);
             }
             self.missing.remove(&name);
@@ -215,10 +216,10 @@ impl TilesheetManager {
         let mut missing = BufWriter::new(File::create(BASE_PATH.join("missing.txt")).unwrap());
         let _ = File::create(BASE_PATH.join("todelete.txt")).unwrap();
         for tile in &self.added {
-            writeln!(&mut additions, "{}", tile).unwrap();
+            writeln!(&mut additions, "{tile}").unwrap();
         }
         for tile in &self.missing {
-            writeln!(&mut missing, "{}", tile).unwrap();
+            writeln!(&mut missing, "{tile}").unwrap();
         }
         drop(additions);
         drop(missing);
@@ -242,10 +243,7 @@ impl TilesheetManager {
                 self.deleted.push(tile.id.unwrap());
                 self.entries.remove(&tile.pos);
             } else {
-                println!(
-                    "ERROR: Requested to delete tile that doesn't exist {:?}",
-                    name
-                );
+                println!("ERROR: Requested to delete tile that doesn't exist {name:?}");
             }
         }
     }
@@ -307,10 +305,10 @@ impl TilesheetManager {
                 None => name.to_owned(),
             };
             if name.contains(&['_', '[', ']'][..]) {
-                println!("ERROR: Illegal name: {:?}", name);
+                println!("ERROR: Illegal name: {name:?}");
                 exit(1);
             }
-            let mut img = image::open(&path).unwrap().to_rgba8();
+            let mut img = image::open(path).unwrap().to_rgba8();
             fix_translucent(&mut img);
             let img = decode_srgb(&img);
             let pos = self.lookup(&name);
@@ -329,12 +327,18 @@ impl TilesheetManager {
                     let name = format!("Tilesheet {} {} {}.png", self.name, tilesheet.size, z);
                     let path = BASE_PATH.join(name);
                     layer.save(&path).unwrap();
-                    Command::new("optipng").arg(path).spawn().unwrap()
+                    spawn(|| {
+                        oxipng::optimize(
+                            &oxipng::InFile::Path(path),
+                            &oxipng::OutFile::Path(None),
+                            &oxipng::Options::max_compression(),
+                        )
+                    })
                 })
             })
             .collect::<Vec<_>>();
-        for mut child in optipng {
-            child.wait().unwrap();
+        for child in optipng {
+            child.join().unwrap().unwrap();
         }
     }
     fn upload_sheets(&self) {
@@ -384,7 +388,7 @@ impl TilesheetManager {
         println!("Encountered the following warnings while uploading tilesheets:");
         for (name, _, warnings) in &failed_uploads {
             for (warning, value) in warnings {
-                println!("[{}] {}: {}", name, warning, value);
+                println!("[{name}] {warning}: {value}");
             }
         }
         println!("To proceed with file uploads, please enter \"continue\".");
@@ -426,7 +430,7 @@ impl TilesheetManager {
                 .mw
                 .delete_tiles(&token, &tiles, Some("ftb-rs deleting tiles"))
             {
-                println!("ERROR: {:?}", e);
+                println!("ERROR: {e:?}");
             }
         }
     }
@@ -446,14 +450,14 @@ impl TilesheetManager {
                 self.mw
                     .add_tiles(&token, &self.name, &tiles, Some("ftb-rs adding tiles"))
             {
-                println!("ERROR: {:?}", e);
+                println!("ERROR: {e:?}");
             }
         }
     }
 }
 fn load_renames(name: &str) -> HashMap<String, String> {
     let path = BASE_PATH.join(name);
-    match File::open(&path.join("renames.txt")) {
+    match File::open(path.join("renames.txt")) {
         Ok(mut file) => {
             let reg = Regex::new("(.*)=(.*)").unwrap();
             let mut s = String::new();
@@ -462,14 +466,14 @@ fn load_renames(name: &str) -> HashMap<String, String> {
                 .filter_map(|line| match reg.captures(line) {
                     Some(cap) => Some((cap[1].to_owned(), cap[2].to_owned())),
                     None => {
-                        println!("WARNING: Invalid line in renames.txt {:?}", line);
+                        println!("WARNING: Invalid line in renames.txt {line:?}");
                         None
                     }
                 })
                 .collect()
         }
         Err(e) => {
-            println!("WARNING: Failed to load renames.txt {:?}", e);
+            println!("WARNING: Failed to load renames.txt {e:?}");
             HashMap::new()
         }
     }
