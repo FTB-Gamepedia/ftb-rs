@@ -133,7 +133,7 @@ fn shrink() {
             continue;
         }
         let name = path.file_name().unwrap().to_str().unwrap();
-        println!("{:?}", name);
+        println!("{name:?}");
         let mut img = image::open(path).unwrap().to_rgba8();
         fix_translucent(&mut img);
         let img = decode_srgb(&img);
@@ -145,7 +145,7 @@ fn shrink() {
         assert!(img.dimensions().0 >= 384, "Image dimensions are too small!");
         let img = resize(&img, 192, 192);
         let img = encode_srgb(&img);
-        img.save(format!("work/shrunk/Block {}", name)).unwrap();
+        img.save(format!("work/shrunk/Block {name}")).unwrap();
     }
 }
 fn main() {
