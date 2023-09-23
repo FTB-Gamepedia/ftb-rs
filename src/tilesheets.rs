@@ -1,7 +1,7 @@
 use crate::{decode_srgb, encode_srgb, fix_translucent, resize, FloatImage};
 use image::{self, ImageBuffer, RgbaImage};
 use lazy_static::lazy_static;
-use mediawiki::{tilesheet::Tilesheet, Mediawiki, Upload};
+use mediawiki::{tilesheet::Tilesheet, Error as MwError, Mediawiki, Upload};
 use regex::Regex;
 use std::{
     borrow::ToOwned,
@@ -364,7 +364,7 @@ impl TilesheetManager {
                         .unwrap();
                     match result["upload"]["result"]
                         .as_str()
-                        .unwrap_or_else(|| panic!("could not find upload result: {:?}", result))
+                        .unwrap_or_else(|| panic!("could not find upload result: {result:?}"))
                     {
                         "Warning" => {
                             let warnings = result["upload"]["warnings"]
@@ -377,7 +377,7 @@ impl TilesheetManager {
                             Some((name, filekey, warnings))
                         }
                         "Success" => None,
-                        other => panic!("Unknown result: {}", other),
+                        other => panic!("Unknown result: {other}"),
                     }
                 })
             })
@@ -399,21 +399,31 @@ impl TilesheetManager {
             exit(1);
         }
         for (name, filekey, _) in failed_uploads {
-            let result = self
-                .mw
-                .upload(
-                    &name,
-                    token,
-                    Upload::Filekey(&filekey),
-                    Some("[[Category:Tilesheets]]"),
-                    Some("Tilesheet uploaded by ftb-rs"),
-                    true,
-                )
-                .unwrap();
-            match result["upload"]["result"].as_str().unwrap() {
+            let result = match self.mw.upload(
+                &name,
+                token,
+                Upload::Filekey(&filekey),
+                Some("[[Category:Tilesheets]]"),
+                Some("Tilesheet uploaded by ftb-rs"),
+                true,
+            ) {
+                Ok(x) => x,
+                Err(MwError::Json(err))
+                    if err["error"]["code"].as_str() == Some("fileexists-no-change") =>
+                {
+                    continue
+                }
+                Err(e) => {
+                    panic!("failed to upload image: {e:?}");
+                }
+            };
+            match result["upload"]["result"]
+                .as_str()
+                .unwrap_or_else(|| panic!("could not find upload result: {result:?}"))
+            {
                 "Warning" => (),
                 "Success" => (),
-                other => panic!("Unknown result: {}", other),
+                other => panic!("Unknown result: {other}"),
             }
         }
     }
