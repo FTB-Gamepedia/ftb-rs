@@ -2,12 +2,12 @@
 authors = ["Peter Atashian <retep998@gmail.com>"]
 name = "ftb"
 version = "0.0.1"
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 regex = "1.4"
 walkdir = "2.3"
-image = { default-features = false, features = ["png"], version = "0.23" }
+image = { default-features = false, features = ["png"], version = "0.24" }
 lazy_static = "1.4"
 mediawiki = { git = "https://github.com/FTB-Gamepedia/mediawiki-rs" }
 oxipng = "8.0.0"
