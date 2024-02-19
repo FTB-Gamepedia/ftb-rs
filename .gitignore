@@ -3,3 +3,6 @@
 /tilesheets
 ftb.json
 *.exe
+# nix-adjacent
+result
+.direnv/
