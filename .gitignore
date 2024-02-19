@@ -3,3 +3,5 @@
 /tilesheets
 ftb.json
 *.exe
+# nix build generates this
+/result
