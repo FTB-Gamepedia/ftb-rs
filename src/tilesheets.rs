@@ -153,7 +153,12 @@ impl TilesheetManager {
             }
             let token = self.mw.get_token().unwrap();
             self.mw
-                .create_sheet(&token, &self.name, &sizes.join("|"))
+                .create_sheet(
+                    &token,
+                    &self.name,
+                    &sizes.join("|"),
+                    "Tilesheet created by ftb-rs",
+                )
                 .unwrap();
         }
     }
