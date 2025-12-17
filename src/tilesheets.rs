@@ -193,7 +193,7 @@ impl TilesheetManager {
             if !path.is_file() {
                 continue;
             }
-            if path.extension().and_then(|x| x.to_str()) != Some("png") {
+            if path.extension().and_then(|x| x.to_str()).map(|e| e.eq_ignore_ascii_case("png")) != Some(true) {
                 continue;
             }
             let name = path.file_stem().unwrap().to_str().unwrap();
@@ -296,7 +296,7 @@ impl TilesheetManager {
             if !path.is_file() {
                 continue;
             }
-            if path.extension().and_then(|x| x.to_str()) != Some("png") {
+            if path.extension().and_then(|x| x.to_str()).map(|e| e.eq_ignore_ascii_case("png")) != Some(true) {
                 continue;
             }
             let name = path.file_stem().unwrap().to_str().unwrap();
